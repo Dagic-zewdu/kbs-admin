@@ -1,17 +1,17 @@
 @import "tailwindcss";
 
-/* Brand colour (a warm rose) used across the admin: bg-brand-600, text-brand-700 ... */
+/* Brand colour: KBS pink. Use bg-brand-600, text-brand-700 ... everywhere instead of raw colours */
 @theme {
-  --color-brand-50: #fff1f3;
-  --color-brand-100: #ffe0e5;
-  --color-brand-200: #ffc6d0;
-  --color-brand-300: #ff9cae;
-  --color-brand-400: #fb6483;
-  --color-brand-500: #f2365f;
-  --color-brand-600: #d9184a;
-  --color-brand-700: #b70f3d;
-  --color-brand-800: #990f39;
-  --color-brand-900: #831136;
+  --color-brand-50: #fdf2f8;
+  --color-brand-100: #fce7f3;
+  --color-brand-200: #fbcfe8;
+  --color-brand-300: #f9a8d4;
+  --color-brand-400: #f472b6;
+  --color-brand-500: #ec4899;
+  --color-brand-600: #db2777;
+  --color-brand-700: #be185d;
+  --color-brand-800: #9d174d;
+  --color-brand-900: #831843;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
 

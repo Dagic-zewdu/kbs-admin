@@ -34,7 +34,7 @@ export function Topbar() {
       </button>
 
       {env.appEnv !== "prod" && (
-        <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold uppercase text-amber-800">
+        <span className="rounded-full bg-brand-100 px-2.5 py-1 text-xs font-semibold uppercase text-brand-700">
           {env.appEnv} environment
         </span>
       )}

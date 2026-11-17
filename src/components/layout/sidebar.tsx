@@ -13,7 +13,7 @@ function NavLink({ item, isActive, onNavigate }: { item: NavItem; isActive: bool
   const Icon = item.icon;
   const classes = clsx(
     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-    isActive ? "bg-brand-50 text-brand-700" : "text-gray-600 hover:bg-gray-100 hover:text-gray-900",
+    isActive ? "bg-brand-50 text-brand-700" : "text-gray-600 hover:bg-brand-50 hover:text-brand-700",
     item.comingSoon && "cursor-not-allowed opacity-60 hover:bg-transparent hover:text-gray-600",
   );
 
