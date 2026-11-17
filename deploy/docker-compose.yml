@@ -1,0 +1,14 @@
+# One stack per environment. On the server it lives in ~/apps/kbs-admin-<dev|prod>/
+# next to a small .env file with APP_ENV and ADMIN_PORT.
+name: kbs-admin-${APP_ENV}
+
+services:
+  admin:
+    image: ghcr.io/dagic-zewdu/kbs-admin:${APP_ENV}
+    restart: unless-stopped
+    # Bound to localhost only; nginx proxies the public domain to it
+    ports:
+      - "127.0.0.1:${ADMIN_PORT}:3000"
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
