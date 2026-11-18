@@ -1,4 +1,4 @@
-import type { ApiResponse, AuthPayload, User } from "@/types/auth";
+import type { ApiResponse, LoginPayload, SignupPayload, User } from "@/types/auth";
 import { baseApi } from "./base-api";
 
 export interface LoginRequest { email: string; password: string }
@@ -7,10 +7,10 @@ export interface ResetPasswordRequest { email: string; code: string; password: s
 
 export const authApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
-    login: build.mutation<ApiResponse<AuthPayload>, LoginRequest>({
+    login: build.mutation<ApiResponse<LoginPayload>, LoginRequest>({
       query: (body) => ({ url: "/admin/auth/login", method: "POST", body }),
     }),
-    signup: build.mutation<ApiResponse<AuthPayload>, SignupRequest>({
+    signup: build.mutation<ApiResponse<SignupPayload>, SignupRequest>({
       query: (body) => ({ url: "/admin/auth/register", method: "POST", body }),
     }),
     forgotPassword: build.mutation<ApiResponse<null>, { email: string }>({

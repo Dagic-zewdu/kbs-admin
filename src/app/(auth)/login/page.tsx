@@ -21,7 +21,7 @@ export default function LoginPage() {
 
   const onSubmit = async (values: LoginValues) => {
     const response = await login(values).unwrap().catch(() => null);
-    if (!response?.data.token) return; // error is shown from `error`
+    if (!response) return; // the error is shown from `error`
 
     dispatch(loggedIn({ token: response.data.token, user: response.data.user }));
     router.replace("/dashboard");

@@ -41,10 +41,13 @@ export const navSections: NavSection[] = [
     title: "Sales",
     items: [
       { label: "Orders", href: "/orders", icon: ShoppingBag, comingSoon: true },
-      { label: "Customers", href: "/customers", icon: Users, comingSoon: true },
       { label: "Discounts", href: "/discounts", icon: Percent, comingSoon: true },
       { label: "Reports", href: "/reports", icon: BarChart3, comingSoon: true },
     ],
+  },
+  {
+    title: "Management",
+    items: [{ label: "Users", href: "/users", icon: Users }],
   },
   {
     title: "System",

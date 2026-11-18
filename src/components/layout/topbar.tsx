@@ -3,12 +3,12 @@
 import { LogOut, Menu } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { env } from "@/config/env";
+import { roleLabels } from "@/lib/labels";
 import { baseApi } from "@/store/api/base-api";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { loggedOut } from "@/store/slices/auth.slice";
 import { toggleSidebar } from "@/store/slices/ui.slice";
 
-const roleLabels = { super_admin: "Super admin", admin: "Admin", customer: "Customer" };
 
 export function Topbar() {
   const router = useRouter();
