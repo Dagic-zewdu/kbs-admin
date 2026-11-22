@@ -58,7 +58,7 @@ export function Topbar() {
           </div>
           <span
             className="flex size-9 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700"
-            title={user ? `${user.firstName} ${user.lastName} · ${roleLabels[user.role]}` : undefined}
+            title={user ? `${[user.firstName, user.lastName].filter(Boolean).join(" ")} · ${roleLabels[user.role]}` : undefined}
           >
             {initials || "?"}
           </span>
