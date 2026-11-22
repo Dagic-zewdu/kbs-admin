@@ -54,3 +54,11 @@ export const navSections: NavSection[] = [
     items: [{ label: "Settings", href: "/settings", icon: Settings, comingSoon: true }],
   },
 ];
+
+export const isActivePath = (pathname: string, href: string) => pathname === href || pathname.startsWith(`${href}/`);
+
+/** Pages pinned to the bottom bar on phones (max 4, the 5th slot is "Menu"). Skips pages that aren't built yet. */
+export const mobileNavItems: NavItem[] = navSections
+  .flatMap((section) => section.items)
+  .filter((item) => !item.comingSoon)
+  .slice(0, 4);

@@ -16,7 +16,7 @@ export function Button({ variant = "primary", isLoading, className, children, di
   return (
     <button
       className={clsx(
-        "inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium transition-colors",
+        "inline-flex h-11 items-center sm:h-10 justify-center gap-2 rounded-lg px-4 text-sm font-medium transition-colors",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:cursor-not-allowed",
         variants[variant],
         className,

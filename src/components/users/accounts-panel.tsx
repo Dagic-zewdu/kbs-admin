@@ -45,8 +45,8 @@ export function AccountsPanel({ group }: { group: AccountGroup }) {
   return (
     <div className="space-y-4">
       {!isSuperAdmin && (
-        <p className="flex items-center gap-2 rounded-lg border border-brand-100 bg-brand-50 px-3 py-2 text-sm text-brand-800">
-          <Info className="size-4 shrink-0" aria-hidden /> Only a super admin can activate or deactivate accounts.
+        <p className="flex items-start gap-2 rounded-lg border border-brand-100 bg-brand-50 px-3 py-2 text-sm text-brand-800">
+          <Info className="mt-0.5 size-4 shrink-0" aria-hidden /> Only a super admin can activate or deactivate accounts.
         </p>
       )}
 
@@ -59,15 +59,15 @@ export function AccountsPanel({ group }: { group: AccountGroup }) {
             value={searchText}
             onChange={(event) => updateSearch(event.target.value)}
             placeholder="Search by name or email"
-            className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
+            className="h-11 w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
           />
         </label>
-        <label className="sm:w-44">
+        <label className="sm:w-44 sm:shrink-0">
           <span className="sr-only">Filter by status</span>
           <select
             value={status}
             onChange={(event) => updateStatus(event.target.value as AccountStatusFilter)}
-            className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
+            className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
           >
             <option value="all">All statuses</option>
             <option value="active">Active</option>

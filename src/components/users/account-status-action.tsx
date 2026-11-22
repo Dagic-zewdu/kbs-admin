@@ -34,7 +34,7 @@ export function AccountStatusAction({ group, account, currentUserId }: AccountSt
         onClick={() => changeStatus({ group, id: account.id, isActive: willActivate })}
         disabled={isLoading}
         className={clsx(
-          "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50",
+          "min-h-10 rounded-lg px-4 text-sm font-medium transition-colors disabled:opacity-50 md:min-h-0 md:px-3 md:py-1.5 md:text-xs",
           willActivate
             ? "bg-brand-600 text-white hover:bg-brand-700"
             : "border border-gray-300 bg-white text-gray-700 hover:border-red-300 hover:bg-red-50 hover:text-red-700",
@@ -42,7 +42,7 @@ export function AccountStatusAction({ group, account, currentUserId }: AccountSt
       >
         {isLoading ? "Saving…" : willActivate ? "Activate" : "Deactivate"}
       </button>
-      {error && <span className="max-w-48 text-right text-xs text-red-600">{getErrorMessage(error)}</span>}
+      {error && <span className="max-w-64 text-right md:max-w-48 text-xs text-red-600">{getErrorMessage(error)}</span>}
     </div>
   );
 }

@@ -19,13 +19,13 @@ export function UsersView() {
   const activeGroup = tabs.find((tab) => tab.group === searchParams.get("tab"))?.group ?? "admins";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold text-gray-900">Users</h1>
+        <h1 className="text-xl font-semibold text-gray-900 sm:text-2xl">Users</h1>
         <p className="mt-1 text-sm text-gray-500">{tabs.find((tab) => tab.group === activeGroup)?.description}</p>
       </header>
 
-      <div className="flex gap-1 border-b border-gray-200" role="tablist">
+      <div className="scrollbar-none -mx-4 flex gap-1 overflow-x-auto border-b border-gray-200 px-4 sm:mx-0 sm:px-0" role="tablist">
         {tabs.map((tab) => (
           <button
             key={tab.group}
@@ -33,7 +33,7 @@ export function UsersView() {
             aria-selected={tab.group === activeGroup}
             onClick={() => router.replace(`${pathname}?tab=${tab.group}`, { scroll: false })}
             className={clsx(
-              "-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition-colors",
+              "-mb-px shrink-0 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors sm:py-2.5",
               tab.group === activeGroup
                 ? "border-brand-600 text-brand-700"
                 : "border-transparent text-gray-500 hover:border-brand-200 hover:text-brand-700",

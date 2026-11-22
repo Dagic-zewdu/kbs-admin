@@ -4,7 +4,7 @@ import { Logo } from "@/components/ui/logo";
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <GuestGuard>
-      <main className="flex min-h-screen">
+      <main className="flex min-h-dvh pt-safe pb-safe">
         {/* Brand panel, hidden on small screens */}
         <section className="hidden w-1/2 flex-col justify-between bg-linear-to-br from-brand-500 via-brand-600 to-brand-800 p-12 text-white lg:flex">
           <Logo tone="light" />
@@ -17,7 +17,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <p className="text-xs text-brand-100">© KBS Cosmetics</p>
         </section>
 
-        <section className="flex flex-1 items-center justify-center px-4 py-12 sm:px-8">
+        <section className="flex flex-1 items-center justify-center px-5 py-10 sm:px-8 sm:py-12">
           <div className="w-full max-w-sm space-y-8">
             <div className="lg:hidden">
               <Logo />
