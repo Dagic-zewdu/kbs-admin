@@ -39,7 +39,7 @@ export function Topbar() {
 
         {/* The sidebar (with the logo) is hidden on phones, so show the logo here */}
         <div className="min-w-0 lg:hidden">
-          <Logo compact />
+          <Logo compact name={user?.company?.name} logoUrl={user?.company?.logoUrl} />
         </div>
 
         {env.appEnv !== "prod" && (

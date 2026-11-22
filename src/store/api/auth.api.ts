@@ -1,8 +1,8 @@
-import type { ApiResponse, LoginPayload, SignupPayload, User } from "@/types/auth";
+import type { AdminProfile, ApiResponse, CompanyBranding, LoginPayload, SignupPayload } from "@/types/auth";
 import { baseApi } from "./base-api";
 
 export interface LoginRequest { email: string; password: string }
-export interface SignupRequest { firstName: string; lastName?: string; email: string; password: string }
+export interface SignupRequest { companySlug: string; firstName: string; lastName?: string; email: string; password: string }
 export interface ResetPasswordRequest { email: string; code: string; password: string }
 
 export const authApi = baseApi.injectEndpoints({
@@ -19,7 +19,11 @@ export const authApi = baseApi.injectEndpoints({
     resetPassword: build.mutation<ApiResponse<null>, ResetPasswordRequest>({
       query: (body) => ({ url: "/admin/auth/reset-password", method: "POST", body }),
     }),
-    getMe: build.query<ApiResponse<User>, void>({
+    /** Public: a company's colour and logo for its login page */
+    getCompanyBranding: build.query<ApiResponse<CompanyBranding>, string>({
+      query: (slug) => `/admin/companies/${encodeURIComponent(slug)}/branding`,
+    }),
+    getMe: build.query<ApiResponse<AdminProfile>, void>({
       query: () => "/admin/auth/me",
       providesTags: ["Me"],
     }),
@@ -32,4 +36,5 @@ export const {
   useForgotPasswordMutation,
   useResetPasswordMutation,
   useGetMeQuery,
+  useGetCompanyBrandingQuery,
 } = authApi;

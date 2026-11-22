@@ -41,6 +41,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const dispatch = useAppDispatch();
   const isOpen = useAppSelector((state) => state.ui.isSidebarOpen);
+  const company = useAppSelector((state) => state.auth.user?.company);
   const close = () => dispatch(closeSidebar());
 
   // Close the drawer when the page changes (e.g. browser back button)
@@ -85,7 +86,7 @@ export function Sidebar() {
         aria-label="Main menu"
       >
         <div className="flex h-16 shrink-0 items-center justify-between px-5">
-          <Logo />
+          <Logo name={company?.name} logoUrl={company?.logoUrl} />
           <button
             onClick={close}
             className="-mr-2 flex size-10 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 lg:hidden"

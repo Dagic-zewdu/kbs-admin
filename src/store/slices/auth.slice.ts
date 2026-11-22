@@ -1,10 +1,10 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import { tokenStorage } from "@/lib/token-storage";
-import type { User } from "@/types/auth";
+import type { AdminProfile } from "@/types/auth";
 
 interface AuthState {
   token: string | null;
-  user: User | null;
+  user: AdminProfile | null;
   /** false until we have read the saved token from localStorage */
   isHydrated: boolean;
 }
@@ -19,12 +19,12 @@ const authSlice = createSlice({
       state.token = tokenStorage.get();
       state.isHydrated = true;
     },
-    loggedIn(state, action: PayloadAction<{ token: string; user: User }>) {
+    loggedIn(state, action: PayloadAction<{ token: string; user: AdminProfile }>) {
       state.token = action.payload.token;
       state.user = action.payload.user;
       tokenStorage.set(action.payload.token);
     },
-    setUser(state, action: PayloadAction<User>) {
+    setUser(state, action: PayloadAction<AdminProfile>) {
       state.user = action.payload;
     },
     loggedOut(state) {

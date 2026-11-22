@@ -2,22 +2,31 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getErrorMessage } from "@/lib/api-error";
+import { getRememberedCompany } from "@/lib/brand-theme";
 import { useSignupMutation } from "@/store/api/auth.api";
 import { signupSchema, type SignupValues } from "@/validations/auth";
 
 export default function SignupPage() {
   const [signup, { isLoading, error }] = useSignupMutation();
   const [pendingMessage, setPendingMessage] = useState("");
-  const { register, handleSubmit, formState } = useForm<SignupValues>({ resolver: zodResolver(signupSchema) });
+  const { register, handleSubmit, formState, setValue } = useForm<SignupValues>({ resolver: zodResolver(signupSchema) });
+  const companyFromUrl = useSearchParams().get("company");
 
-  const onSubmit = async ({ firstName, lastName, email, password }: SignupValues) => {
-    const response = await signup({ firstName, lastName, email, password }).unwrap().catch(() => null);
+  // Fill in the company code from the link (?company=) or the last company used on this device
+  useEffect(() => {
+    const code = companyFromUrl || getRememberedCompany()?.slug;
+    if (code) setValue("companySlug", code);
+  }, [companyFromUrl, setValue]);
+
+  const onSubmit = async ({ companySlug, firstName, lastName, email, password }: SignupValues) => {
+    const response = await signup({ companySlug, firstName, lastName, email, password }).unwrap().catch(() => null);
     if (!response) return;
 
     // New admin accounts are inactive until a super admin activates them
@@ -41,11 +50,19 @@ export default function SignupPage() {
     <>
       <header className="space-y-1.5">
         <h1 className="text-2xl font-semibold text-gray-900">Create your account</h1>
-        <p className="text-sm text-gray-500">New accounts can sign in once a super admin activates them.</p>
+        <p className="text-sm text-gray-500">Ask your company for its code. You can sign in once your company&apos;s super admin activates you.</p>
       </header>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
         <Alert>{getErrorMessage(error)}</Alert>
+        <Input
+          label="Company code"
+          placeholder="e.g. kbs-cosmetics"
+          autoComplete="organization"
+          autoCapitalize="none"
+          error={errors.companySlug?.message}
+          {...register("companySlug")}
+        />
         <div className="grid grid-cols-2 gap-3">
           <Input label="First name" autoComplete="given-name" error={errors.firstName?.message} {...register("firstName")} />
           <Input label="Last name" autoComplete="family-name" error={errors.lastName?.message} {...register("lastName")} />

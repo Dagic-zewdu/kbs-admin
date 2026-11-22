@@ -13,11 +13,14 @@ const rawBaseQuery = fetchBaseQuery({
   },
 });
 
-/** True when the server says the session is no longer valid (bad token, or account deactivated) */
+/** Codes that mean the admin can't use the site any more (account deactivated, no company, company suspended) */
+const SESSION_ENDING_CODES = ["ACCOUNT_INACTIVE", "NO_COMPANY", "COMPANY_SUSPENDED"];
+
+/** True when the server says the session is no longer valid */
 const isSessionEnded = (error: FetchBaseQueryError) => {
   if (error.status === 401) return true;
   const code = (error.data as ApiResponse<null> | undefined)?.code;
-  return error.status === 403 && code === "ACCOUNT_INACTIVE";
+  return error.status === 403 && SESSION_ENDING_CODES.includes(code ?? "");
 };
 
 // When the session ends, log out so the guard sends the user to /login

@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Brand colour: KBS pink. Use bg-brand-600, text-brand-700 ... everywhere instead of raw colours */
+/* Brand colour: pink by default, replaced at runtime by the company colour (src/lib/brand-theme.ts). Use bg-brand-600, text-brand-700 ... everywhere instead of raw colours */
 @theme {
   --color-brand-50: #fdf2f8;
   --color-brand-100: #fce7f3;

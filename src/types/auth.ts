@@ -15,6 +15,8 @@ export interface User {
   phone: string | null;
   role: UserRole;
   authProvider: AuthProvider;
+  /** The company an admin account belongs to */
+  companyId: string | null;
   isActive: boolean;
   lastLoginAt: string | null;
   statusChangedAt: string | null;
@@ -31,8 +33,24 @@ export interface ApiResponse<T> {
   errors?: { field: string; message: string }[];
 }
 
+/** How the admin site looks for a company: its name, colour and logo */
+export interface CompanyBranding {
+  id: string;
+  name: string;
+  slug: string;
+  /** #RRGGBB */
+  brandColor: string;
+  /** Signed URL, expires after about an hour */
+  logoUrl: string | null;
+}
+
+/** The signed-in admin and the company they work for */
+export interface AdminProfile extends User {
+  company: (CompanyBranding & { status: "active" | "suspended" }) | null;
+}
+
 export interface LoginPayload {
-  user: User;
+  user: AdminProfile;
   token: string;
 }
 
