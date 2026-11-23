@@ -1,8 +1,10 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { LinkIcon } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -11,61 +13,66 @@ import { getErrorMessage } from "@/lib/api-error";
 import { useResetPasswordMutation } from "@/store/api/auth.api";
 import { resetPasswordSchema, type ResetPasswordValues } from "@/validations/auth";
 
-export default function ResetPasswordPage() {
+const loginHrefFor = (company: string | null) => (company ? `/login?company=${encodeURIComponent(company)}` : "/login");
+const linkClass = "flex h-11 items-center justify-center rounded-lg bg-brand-600 text-sm font-medium text-white hover:bg-brand-700 sm:h-10";
+
+/** Step 2: opened from the emailed link (?token=…). Only asks for the new password. */
+function ResetPasswordForm() {
+  const params = useSearchParams();
+  const token = params.get("token") ?? "";
+  const loginHref = loginHrefFor(params.get("company"));
   const [resetPassword, { isLoading, error }] = useResetPasswordMutation();
   const [isDone, setIsDone] = useState(false);
-  const { register, handleSubmit, formState, setValue } = useForm<ResetPasswordValues>({
-    resolver: zodResolver(resetPasswordSchema),
-  });
+  const { register, handleSubmit, formState } = useForm<ResetPasswordValues>({ resolver: zodResolver(resetPasswordSchema) });
 
-  // Pre-fill the email typed on the forgot password page
-  useEffect(() => {
-    const savedEmail = sessionStorage.getItem("kbs_reset_email");
-    if (savedEmail) setValue("email", savedEmail);
-  }, [setValue]);
-
-  const onSubmit = async ({ email, code, password }: ResetPasswordValues) => {
-    const response = await resetPassword({ email, code, password }).unwrap().catch(() => null);
-    if (!response) return;
-    sessionStorage.removeItem("kbs_reset_email");
-    setIsDone(true);
-  };
+  if (!token) {
+    return (
+      <div className="space-y-6 text-center">
+        <LinkIcon className="mx-auto size-10 text-gray-400" aria-hidden />
+        <div className="space-y-2">
+          <h1 className="text-2xl font-semibold text-gray-900">Open the link from your email</h1>
+          <p className="text-sm text-gray-500">To reset your password, ask for a reset link and open it from your email.</p>
+        </div>
+        <Link href="/forgot-password" className={linkClass}>
+          Get a reset link
+        </Link>
+      </div>
+    );
+  }
 
   if (isDone) {
     return (
       <div className="space-y-6">
-        <Alert type="success">Your password has been updated.</Alert>
-        <Link
-          href="/login"
-          className="flex h-10 items-center justify-center rounded-lg bg-brand-600 text-sm font-medium text-white hover:bg-brand-700"
-        >
+        <Alert type="success">Your password has been updated. Sign in with your new password.</Alert>
+        <Link href={loginHref} className={linkClass}>
           Sign in
         </Link>
       </div>
     );
   }
 
+  const onSubmit = async ({ password }: ResetPasswordValues) => {
+    const response = await resetPassword({ token, password }).unwrap().catch(() => null);
+    if (response) setIsDone(true);
+  };
+
   const { errors } = formState;
+  const isLinkInvalid = (error as { data?: { code?: string } } | undefined)?.data?.code === "INVALID_RESET_LINK";
 
   return (
     <>
       <header className="space-y-1.5">
-        <h1 className="text-2xl font-semibold text-gray-900">Set a new password</h1>
-        <p className="text-sm text-gray-500">Enter the code we emailed you and choose a new password.</p>
+        <h1 className="text-2xl font-semibold text-gray-900">Choose a new password</h1>
+        <p className="text-sm text-gray-500">At least 8 characters, with a letter and a number.</p>
       </header>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
         <Alert>{getErrorMessage(error)}</Alert>
-        <Input label="Email" type="email" autoComplete="email" error={errors.email?.message} {...register("email")} />
-        <Input
-          label="Reset code"
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          maxLength={6}
-          placeholder="123456"
-          error={errors.code?.message}
-          {...register("code")}
-        />
+        {isLinkInvalid && (
+          <Link href="/forgot-password" className="block text-sm font-medium text-brand-700 hover:underline">
+            Get a new reset link →
+          </Link>
+        )}
         <Input label="New password" type="password" autoComplete="new-password" error={errors.password?.message} {...register("password")} />
         <Input
           label="Confirm new password"
@@ -78,13 +85,14 @@ export default function ResetPasswordPage() {
           Update password
         </Button>
       </form>
-
-      <p className="text-center text-sm text-gray-500">
-        Didn&apos;t get a code?{" "}
-        <Link href="/forgot-password" className="font-medium text-brand-700 hover:underline">
-          Send again
-        </Link>
-      </p>
     </>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense>
+      <ResetPasswordForm />
+    </Suspense>
   );
 }

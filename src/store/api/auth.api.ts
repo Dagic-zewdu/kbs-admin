@@ -18,7 +18,7 @@ export interface CompanyRequestBody {
   message?: string;
 }
 export interface CompanyRequestReceipt { id: string; companyName: string; status: "pending"; createdAt: string }
-export interface ResetPasswordRequest { email: string; code: string; password: string }
+export interface ResetPasswordRequest { token: string; password: string }
 
 export const authApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
