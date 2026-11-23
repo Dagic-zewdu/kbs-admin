@@ -34,6 +34,10 @@ export const authApi = baseApi.injectEndpoints({
     resetPassword: build.mutation<ApiResponse<null>, ResetPasswordRequest>({
       query: (body) => ({ url: "/admin/auth/reset-password", method: "POST", body }),
     }),
+    /** Public: active companies for the sign-up dropdown */
+    listCompanies: build.query<ApiResponse<CompanyBranding[]>, void>({
+      query: () => "/admin/companies",
+    }),
     /** Public: a company's colour and logo for its login page */
     getCompanyBranding: build.query<ApiResponse<CompanyBranding>, string>({
       query: (slug) => `/admin/companies/${encodeURIComponent(slug)}/branding`,
@@ -56,5 +60,6 @@ export const {
   useResetPasswordMutation,
   useGetMeQuery,
   useGetCompanyBrandingQuery,
+  useListCompaniesQuery,
   useRequestCompanyMutation,
 } = authApi;

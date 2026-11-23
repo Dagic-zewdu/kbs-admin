@@ -15,7 +15,7 @@ export const loginSchema = z.object({
 
 export const signupSchema = z
   .object({
-    companySlug: z.string().trim().toLowerCase().min(1, "Enter your company code"),
+    companySlug: z.string().trim().toLowerCase().min(1, "Choose your company"),
     firstName: z.string().trim().min(1, "First name is required"),
     lastName: z.string().trim().optional(),
     email,

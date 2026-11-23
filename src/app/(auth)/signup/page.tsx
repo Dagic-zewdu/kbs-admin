@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getErrorMessage } from "@/lib/api-error";
 import { getRememberedCompany } from "@/lib/brand-theme";
-import { useSignupMutation } from "@/store/api/auth.api";
+import { useListCompaniesQuery, useSignupMutation } from "@/store/api/auth.api";
 import { signupSchema, type SignupValues } from "@/validations/auth";
 
 export default function SignupPage() {
@@ -18,12 +18,14 @@ export default function SignupPage() {
   const [pendingMessage, setPendingMessage] = useState("");
   const { register, handleSubmit, formState, setValue } = useForm<SignupValues>({ resolver: zodResolver(signupSchema) });
   const companyFromUrl = useSearchParams().get("company");
+  const { data: companiesData, isLoading: isLoadingCompanies } = useListCompaniesQuery();
+  const companies = companiesData?.data ?? [];
 
-  // Fill in the company code from the link (?company=) or the last company used on this device
+  // Preselect the company from the link (?company=) or the last company used on this device, once the list is loaded
   useEffect(() => {
     const code = companyFromUrl || getRememberedCompany()?.slug;
-    if (code) setValue("companySlug", code);
-  }, [companyFromUrl, setValue]);
+    if (code && companies.some((company) => company.slug === code)) setValue("companySlug", code);
+  }, [companyFromUrl, companies, setValue]);
 
   const onSubmit = async ({ companySlug, firstName, lastName, email, password }: SignupValues) => {
     const response = await signup({ companySlug, firstName, lastName, email, password }).unwrap().catch(() => null);
@@ -50,19 +52,36 @@ export default function SignupPage() {
     <>
       <header className="space-y-1.5">
         <h1 className="text-2xl font-semibold text-gray-900">Create your account</h1>
-        <p className="text-sm text-gray-500">Ask your company for its code. You can sign in once your company&apos;s super admin activates you.</p>
+        <p className="text-sm text-gray-500">Choose your company. You can sign in once your company&apos;s super admin activates you.</p>
       </header>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
         <Alert>{getErrorMessage(error)}</Alert>
-        <Input
-          label="Company code"
-          placeholder="e.g. kbs-cosmetics"
-          autoComplete="organization"
-          autoCapitalize="none"
-          error={errors.companySlug?.message}
-          {...register("companySlug")}
-        />
+        <div className="space-y-1.5">
+          <label htmlFor="companySlug" className="block text-sm font-medium text-gray-700">
+            Company
+          </label>
+          <select
+            id="companySlug"
+            defaultValue=""
+            disabled={isLoadingCompanies}
+            aria-invalid={Boolean(errors.companySlug)}
+            className={`h-11 w-full rounded-lg border bg-white px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 sm:h-10 ${
+              errors.companySlug ? "border-red-400 focus:ring-red-200" : "border-gray-300 focus:border-brand-500 focus:ring-brand-100"
+            }`}
+            {...register("companySlug")}
+          >
+            <option value="" disabled>
+              {isLoadingCompanies ? "Loading companies…" : "Choose the company you work for"}
+            </option>
+            {companies.map((company) => (
+              <option key={company.slug} value={company.slug}>
+                {company.name}
+              </option>
+            ))}
+          </select>
+          {errors.companySlug && <p className="text-xs text-red-600">{errors.companySlug.message}</p>}
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <Input label="First name" autoComplete="given-name" error={errors.firstName?.message} {...register("firstName")} />
           <Input label="Last name" autoComplete="family-name" error={errors.lastName?.message} {...register("lastName")} />
