@@ -81,12 +81,20 @@ export default function SignupPage() {
         </Button>
       </form>
 
-      <p className="text-center text-sm text-gray-500">
-        Already have an account?{" "}
-        <Link href="/login" className="font-medium text-brand-700 hover:underline">
-          Sign in
-        </Link>
-      </p>
+      <div className="space-y-2 text-center text-sm text-gray-500">
+        <p>
+          Already have an account?{" "}
+          <Link href="/login" className="font-medium text-brand-700 hover:underline">
+            Sign in
+          </Link>
+        </p>
+        <p>
+          Your company isn&apos;t on E-commerce Cosmetics yet?{" "}
+          <Link href="/register-company" className="font-medium text-brand-700 hover:underline">
+            Register your company
+          </Link>
+        </p>
+      </div>
     </>
   );
 }

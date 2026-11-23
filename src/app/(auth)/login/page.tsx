@@ -62,6 +62,11 @@ export default function LoginPage() {
         <Link href={`/signup${companyQuery}`} className="font-medium text-brand-700 hover:underline">
           Create an account
         </Link>
+        <br />
+        New business?{" "}
+        <Link href="/register-company" className="font-medium text-brand-700 hover:underline">
+          Register your company
+        </Link>
       </p>
     </>
   );

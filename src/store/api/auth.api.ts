@@ -3,6 +3,21 @@ import { baseApi } from "./base-api";
 
 export interface LoginRequest { email: string; password: string }
 export interface SignupRequest { companySlug: string; firstName: string; lastName?: string; email: string; password: string }
+export interface CompanyRequestBody {
+  companyName: string;
+  phone: string;
+  secondaryPhone?: string;
+  email?: string;
+  city?: string;
+  address?: string;
+  description?: string;
+  contactFirstName: string;
+  contactLastName?: string;
+  contactEmail: string;
+  contactPhone?: string;
+  message?: string;
+}
+export interface CompanyRequestReceipt { id: string; companyName: string; status: "pending"; createdAt: string }
 export interface ResetPasswordRequest { email: string; code: string; password: string }
 
 export const authApi = baseApi.injectEndpoints({
@@ -23,6 +38,10 @@ export const authApi = baseApi.injectEndpoints({
     getCompanyBranding: build.query<ApiResponse<CompanyBranding>, string>({
       query: (slug) => `/admin/companies/${encodeURIComponent(slug)}/branding`,
     }),
+    /** Public: "Register your company" - the platform reviews it */
+    requestCompany: build.mutation<ApiResponse<CompanyRequestReceipt>, CompanyRequestBody>({
+      query: (body) => ({ url: "/admin/company-requests", method: "POST", body }),
+    }),
     getMe: build.query<ApiResponse<AdminProfile>, void>({
       query: () => "/admin/auth/me",
       providesTags: ["Me"],
@@ -37,4 +56,5 @@ export const {
   useResetPasswordMutation,
   useGetMeQuery,
   useGetCompanyBrandingQuery,
+  useRequestCompanyMutation,
 } = authApi;
