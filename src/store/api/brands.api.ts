@@ -1,5 +1,6 @@
 import type { ApiResponse, PaginatedResult } from "@/types/auth";
 import type { BrandSearchResult, CompanyBrand } from "@/types/brand";
+import type { Affected, Usage } from "@/types/shared-item";
 import type { UploadedFile } from "@/types/file";
 import { baseApi } from "./base-api";
 
@@ -10,6 +11,8 @@ export interface ListBrandsRequest {
   sort?: "name" | "newest";
   /** us = added by my company */
   addedBy?: "all" | "us";
+  /** Also our own inactive brands */
+  includeInactive?: boolean;
 }
 
 export interface CreateBrandRequest {
@@ -20,12 +23,43 @@ export interface CreateBrandRequest {
   description?: string;
 }
 
+export interface UpdateBrandRequest {
+  id: string;
+  name: string;
+  /** Left out = unchanged, null = removed */
+  logoFileId?: string | null;
+  country: string | null;
+  website: string | null;
+  description: string | null;
+}
+
 /** Brands are shared by every company: select an existing one or create a new one. */
 export const brandsApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
     listBrands: build.query<ApiResponse<PaginatedResult<CompanyBrand>>, ListBrandsRequest>({
       query: (params) => ({ url: "/admin/brands", params: { ...params, search: params.search || undefined } }),
       providesTags: ["Brands"],
+    }),
+    getBrand: build.query<ApiResponse<CompanyBrand>, string>({
+      query: (id) => `/admin/brands/${id}`,
+      providesTags: ["Brands"],
+    }),
+    /** For the warning before deleting; always fetched again */
+    getBrandUsage: build.query<ApiResponse<Usage>, string>({
+      query: (id) => `/admin/brands/${id}/usage`,
+      keepUnusedDataFor: 0,
+    }),
+    updateBrand: build.mutation<ApiResponse<CompanyBrand>, UpdateBrandRequest>({
+      query: ({ id, ...body }) => ({ url: `/admin/brands/${id}`, method: "PATCH", body }),
+      invalidatesTags: ["Brands", "Products", "Product"],
+    }),
+    changeBrandStatus: build.mutation<ApiResponse<CompanyBrand>, { id: string; isActive: boolean }>({
+      query: ({ id, isActive }) => ({ url: `/admin/brands/${id}/status`, method: "PATCH", body: { isActive } }),
+      invalidatesTags: ["Brands"],
+    }),
+    deleteBrand: build.mutation<ApiResponse<Affected>, string>({
+      query: (id) => ({ url: `/admin/brands/${id}`, method: "DELETE" }),
+      invalidatesTags: ["Brands", "Products", "Product"],
     }),
     searchBrands: build.query<ApiResponse<BrandSearchResult>, string>({
       query: (q) => ({ url: "/admin/brands/search", params: { q } }),
@@ -47,4 +81,4 @@ export const brandsApi = baseApi.injectEndpoints({
   }),
 });
 
-export const { useListBrandsQuery, useSearchBrandsQuery, useCreateBrandMutation, useUploadBrandLogoMutation } = brandsApi;
+export const { useListBrandsQuery, useSearchBrandsQuery, useCreateBrandMutation, useUploadBrandLogoMutation, useGetBrandQuery, useGetBrandUsageQuery, useUpdateBrandMutation, useChangeBrandStatusMutation, useDeleteBrandMutation } = brandsApi;

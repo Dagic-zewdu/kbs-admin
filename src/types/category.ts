@@ -1,3 +1,5 @@
+import type { Ownership } from "./shared-item";
+
 /** A product category, shared by every company */
 export interface Category {
   id: string;
@@ -11,6 +13,12 @@ export interface Category {
   depth: number;
   sortOrder: number;
   childrenCount: number;
+}
+
+/** A category in the management list */
+export interface CompanyCategory extends Category, Ownership {
+  /** false when it, or a category above it, is inactive */
+  isVisible: boolean;
 }
 
 export interface CategorySearchResult {

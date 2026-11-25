@@ -9,16 +9,18 @@ const MAX_BYTES = 2 * 1024 * 1024;
 const ACCEPT = "image/png,image/jpeg,image/webp,image/gif";
 
 interface BrandLogoUploadProps {
+  /** The current logo, when editing */
+  initialUrl?: string | null;
   /** The uploaded file id, or "" when the logo is removed */
   onChange: (fileId: string) => void;
   onUploading: (isUploading: boolean) => void;
 }
 
 /** Choose or drop an image; it's uploaded to private storage right away. */
-export function BrandLogoUpload({ onChange, onUploading }: BrandLogoUploadProps) {
+export function BrandLogoUpload({ initialUrl, onChange, onUploading }: BrandLogoUploadProps) {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(initialUrl ?? null);
   const [localError, setLocalError] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [upload, { isLoading, error, reset }] = useUploadBrandLogoMutation();

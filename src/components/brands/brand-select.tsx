@@ -83,7 +83,7 @@ function CreateBrandPanel({ name, onBack, onSelect }: CreatePanelProps<Brand>) {
         autoFocus
       />
       <BrandLogoUpload onChange={setLogoFileId} onUploading={setIsUploading} />
-      <p className="text-xs text-gray-500">Check the spelling: every company will use this brand, and only the platform can change it later.</p>
+      <p className="text-xs text-gray-500">Check the spelling: every company can use this brand.</p>
       {error && (
         <Alert>
           {getErrorMessage(error)}

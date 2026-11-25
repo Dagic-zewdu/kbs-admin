@@ -18,13 +18,18 @@ const fieldClasses =
 
 /** The shared brands in a table */
 export function BrandsView() {
-  const created = useSearchParams().get("created");
+  const params = useSearchParams();
+  const created = params.get("created");
+  const saved = params.get("saved");
+  const [notice, setNotice] = useState(
+    created ? `${created} was created. Every company can use it now.` : saved ? `${saved} was saved.` : "",
+  );
   const [searchText, setSearchText] = useState("");
   const [addedBy, setAddedBy] = useState<NonNullable<ListBrandsRequest["addedBy"]>>("all");
   const [sort, setSort] = useState<NonNullable<ListBrandsRequest["sort"]>>("name");
   const [page, setPage] = useState(1);
   const search = useDebouncedValue(searchText.trim());
-  const { data, isLoading, isFetching, error } = useListBrandsQuery({ page, limit: PAGE_SIZE, search, addedBy, sort });
+  const { data, isLoading, isFetching, error } = useListBrandsQuery({ page, limit: PAGE_SIZE, search, addedBy, sort, includeInactive: true });
   const result = data?.data;
   const isFiltered = Boolean(search) || addedBy !== "all";
 
@@ -39,8 +44,8 @@ export function BrandsView() {
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      <PageHeader title="Brands" description="Shared by every company. Create a brand when it's missing." actions={createButton} />
-      {created && <Alert type="success">{created} was created. Every company can use it now.</Alert>}
+      <PageHeader title="Brands" description="Shared by every company. You can change the brands you created." actions={createButton} />
+      {notice && <Alert type="success">{notice}</Alert>}
 
       <div className="flex flex-col gap-3 sm:flex-row">
         <label className="relative flex-1">
@@ -67,7 +72,7 @@ export function BrandsView() {
           className={`${fieldClasses} px-3 sm:w-44`}
         >
           <option value="all">All brands</option>
-          <option value="us">Added by you</option>
+          <option value="us">Created by you</option>
         </select>
         <select
           aria-label="Sort"
@@ -96,7 +101,7 @@ export function BrandsView() {
         )}
         {result && result.items.length > 0 && (
           <>
-            <BrandsTable brands={result.items} />
+            <BrandsTable brands={result.items} onDone={setNotice} />
             <Pagination page={result.page} totalPages={result.totalPages} total={result.total} limit={result.limit} onPageChange={setPage} />
           </>
         )}

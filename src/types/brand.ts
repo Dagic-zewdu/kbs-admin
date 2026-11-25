@@ -1,3 +1,5 @@
+import type { Ownership } from "./shared-item";
+
 /** A product brand, shared by every company */
 export interface Brand {
   id: string;
@@ -10,9 +12,7 @@ export interface Brand {
 }
 
 /** A brand in the list */
-export interface CompanyBrand extends Brand {
-  /** true when this company added it */
-  addedByUs: boolean;
+export interface CompanyBrand extends Brand, Ownership {
   createdAt: string;
 }
 

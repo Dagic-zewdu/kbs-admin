@@ -10,31 +10,50 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Textarea } from "@/components/ui/textarea";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { getErrorMessage } from "@/lib/api-error";
-import { useCreateBrandMutation, useSearchBrandsQuery } from "@/store/api/brands.api";
+import { useCreateBrandMutation, useSearchBrandsQuery, useUpdateBrandMutation } from "@/store/api/brands.api";
+import type { Brand, CompanyBrand } from "@/types/brand";
 import { BrandLogo } from "./brand-logo";
 import { BrandLogoUpload } from "./brand-logo-upload";
 
-/** /brands/new */
-export function CreateBrandForm() {
+/** /brands/new and /brands/[id]/edit */
+export function BrandForm({ brand }: { brand?: CompanyBrand }) {
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [logoFileId, setLogoFileId] = useState("");
+  const [name, setName] = useState(brand?.name ?? "");
+  // undefined = unchanged, "" = removed
+  const [logoFileId, setLogoFileId] = useState<string | undefined>(undefined);
   const [isUploading, setIsUploading] = useState(false);
-  const [country, setCountry] = useState("");
-  const [website, setWebsite] = useState("");
-  const [description, setDescription] = useState("");
-  const [createBrand, { isLoading, isSuccess, error }] = useCreateBrandMutation();
+  const [country, setCountry] = useState(brand?.country ?? "");
+  const [website, setWebsite] = useState(brand?.website ?? "");
+  const [description, setDescription] = useState(brand?.description ?? "");
+  const [createBrand, createState] = useCreateBrandMutation();
+  const [updateBrand, updateState] = useUpdateBrandMutation();
+  const isLoading = createState.isLoading || updateState.isLoading;
+  const isSuccess = createState.isSuccess || updateState.isSuccess;
+  const error = createState.error || updateState.error;
 
   // Warn while typing, so nobody fills the form for a brand that exists
   const typed = name.trim().replace(/\s+/g, " ");
   const query = useDebouncedValue(typed, 300);
   const search = useSearchBrandsQuery(query, { skip: query.length < 2 || isSuccess });
   const found = query === typed && typed.length >= 2 && !search.isFetching ? search.data?.data : undefined;
-  const existing = found?.exact[0];
-  const similar = existing ? [] : (found?.similar ?? []);
+  const others = (list: Brand[] = []) => list.filter((item) => item.id !== brand?.id);
+  const existing = others(found?.exact)[0];
+  const similar = existing || brand ? [] : others(found?.similar);
 
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (brand) {
+      const result = await updateBrand({
+        id: brand.id,
+        name: typed,
+        logoFileId: logoFileId === undefined ? undefined : logoFileId || null,
+        country: country.trim() || null,
+        website: website.trim() || null,
+        description: description.trim() || null,
+      });
+      if (result.data) router.push(`/brands?saved=${encodeURIComponent(result.data.data.name)}`);
+      return;
+    }
     const result = await createBrand({
       name: typed,
       logoFileId: logoFileId || undefined,
@@ -47,7 +66,7 @@ export function CreateBrandForm() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-5 sm:space-y-6">
-      <PageHeader title="Create brand" description="Every company will be able to use it." backHref="/brands" />
+      <PageHeader title={brand ? `Edit ${brand.name}` : "Create brand"} description="Every company can use it." backHref="/brands" />
 
       <form onSubmit={save} className="space-y-5 rounded-xl border border-gray-200 bg-white p-4 sm:p-6">
         <div className="space-y-2">
@@ -60,7 +79,7 @@ export function CreateBrandForm() {
             minLength={2}
             maxLength={80}
             autoFocus
-            error={existing ? "This brand already exists, so you don't need to create it." : undefined}
+            error={existing ? "This brand already exists." : undefined}
           />
           {existing && (
             <p className="flex items-center gap-2.5 rounded-lg border border-gray-200 p-2.5 text-sm text-gray-800">
@@ -81,7 +100,7 @@ export function CreateBrandForm() {
           )}
         </div>
 
-        <BrandLogoUpload onChange={setLogoFileId} onUploading={setIsUploading} />
+        <BrandLogoUpload initialUrl={brand?.logoUrl} onChange={setLogoFileId} onUploading={setIsUploading} />
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Input
@@ -108,7 +127,6 @@ export function CreateBrandForm() {
           maxLength={1000}
         />
 
-        <p className="text-xs text-gray-500">Check the spelling: only the platform can change a brand after it&apos;s created.</p>
         {error && <Alert>{getErrorMessage(error)}</Alert>}
 
         <div className="flex flex-col-reverse gap-2 border-t border-gray-100 pt-4 sm:flex-row sm:justify-end">
@@ -119,7 +137,7 @@ export function CreateBrandForm() {
             Cancel
           </Link>
           <Button type="submit" isLoading={isLoading} disabled={Boolean(existing) || isUploading || isSuccess}>
-            Create brand
+            {brand ? "Save changes" : "Create brand"}
           </Button>
         </div>
       </form>

@@ -89,7 +89,7 @@ function CreateCategoryPanel({ name, onBack, onSelect }: CreatePanelProps<Catego
           ))}
         </select>
       </div>
-      <p className="text-xs text-gray-500">Every company will be able to use it. Only the platform can rename or remove it later.</p>
+      <p className="text-xs text-gray-500">Every company will be able to use it.</p>
       {error && (
         <Alert>
           {getErrorMessage(error)}
