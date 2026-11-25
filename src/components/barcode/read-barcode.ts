@@ -1,75 +1,173 @@
-/** Reads a barcode from a video frame: the browser's own reader where there is one (Android, Chrome), else ZXing (iPhone, Firefox). */
-export type FrameReader = (video: HTMLVideoElement) => Promise<string | null>;
-
-const FORMATS = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39", "itf"];
+/**
+ * Two readers look at the camera side by side and the first sure answer wins:
+ * the browser's own (Android, Chrome) and ZXing in a worker (every browser).
+ * One of them failing doesn't stop the other.
+ */
+interface Found {
+  code: string;
+  /** Needs more equal reads: the code has no check digit that catches a wrong read */
+  isWeak: boolean;
+}
 
 interface NativeDetector {
-  detect: (source: HTMLVideoElement) => Promise<{ rawValue: string }[]>;
+  detect: (source: HTMLVideoElement) => Promise<{ rawValue: string; format: string }[]>;
 }
 interface NativeDetectorClass {
   new (options: { formats: string[] }): NativeDetector;
   getSupportedFormats: () => Promise<string[]>;
 }
 
-const nativeReader = async (): Promise<FrameReader | null> => {
+const FORMATS = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39", "itf"];
+const WEAK_FORMATS = /^(code_?39|itf)/i;
+/** Equal reads needed, so a blurred frame can't give a wrong number */
+const SURE_AFTER = 2;
+const WEAK_SURE_AFTER = 4;
+/** A native reader that fails this often is broken on this device */
+const MAX_NATIVE_FAILURES = 5;
+/** A frame without an answer is given up after this long */
+const WORKER_TIMEOUT_MS = 8000;
+
+const toFound = (code: string, format: string): Found => ({ code: code.trim(), isWeak: WEAK_FORMATS.test(format) });
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const createNative = async () => {
   const Detector = (window as { BarcodeDetector?: NativeDetectorClass }).BarcodeDetector;
   if (!Detector) return null;
   try {
     const supported = await Detector.getSupportedFormats();
     if (!supported.includes("ean_13")) return null;
-    const detector = new Detector({ formats: FORMATS.filter((format) => supported.includes(format)) });
-    return async (video) => (await detector.detect(video))[0]?.rawValue ?? null;
+    return new Detector({ formats: FORMATS.filter((format) => supported.includes(format)) });
   } catch {
     return null;
   }
 };
 
-const zxingReader = async (): Promise<FrameReader> => {
-  // Loaded only when needed: it's a big library
-  const { BarcodeFormat, BinaryBitmap, DecodeHintType, HybridBinarizer, MultiFormatReader, RGBLuminanceSource } = await import("@zxing/library");
-  const reader = new MultiFormatReader();
-  reader.setHints(
-    new Map<number, unknown>([
-      [
-        DecodeHintType.POSSIBLE_FORMATS,
-        [
-          BarcodeFormat.EAN_13,
-          BarcodeFormat.EAN_8,
-          BarcodeFormat.UPC_A,
-          BarcodeFormat.UPC_E,
-          BarcodeFormat.CODE_128,
-          BarcodeFormat.CODE_39,
-          BarcodeFormat.ITF,
-        ],
-      ],
-      [DecodeHintType.TRY_HARDER, true],
-    ]),
-  );
-  const canvas = document.createElement("canvas");
-  const context = canvas.getContext("2d", { willReadFrequently: true });
-
-  return async (video) => {
-    if (!context || !video.videoWidth) return null;
-    // The middle of the picture, where the frame is drawn
-    const width = Math.min(1000, video.videoWidth);
-    const height = Math.round((width * video.videoHeight * 0.6) / video.videoWidth);
-    canvas.width = width;
-    canvas.height = height;
-    context.drawImage(video, 0, video.videoHeight * 0.2, video.videoWidth, video.videoHeight * 0.6, 0, 0, width, height);
-    const { data } = context.getImageData(0, 0, width, height);
-    const gray = new Uint8ClampedArray(width * height);
-    for (let pixel = 0; pixel < gray.length; pixel++) {
-      const at = pixel * 4;
-      gray[pixel] = (data[at] * 306 + data[at + 1] * 601 + data[at + 2] * 117) >> 10;
-    }
-    try {
-      return reader.decode(new BinaryBitmap(new HybridBinarizer(new RGBLuminanceSource(gray, width, height)))).getText();
-    } catch {
-      return null; // nothing readable in this frame
-    } finally {
-      reader.reset();
-    }
+const createWorker = () => {
+  const worker = new Worker(new URL("./barcode-worker.ts", import.meta.url), { type: "module" });
+  const waiting = new Map<number, (found: Found | null) => void>();
+  let lastId = 0;
+  let hasFailed = false;
+  const fail = () => {
+    hasFailed = true;
+    waiting.forEach((resolve) => resolve(null));
+    waiting.clear();
+  };
+  worker.onerror = fail;
+  worker.onmessage = ({ data }: MessageEvent<{ id: number; code?: string; format?: string; error?: string }>) => {
+    if (data.error) console.error("Barcode reader:", data.error);
+    waiting.get(data.id)?.(data.code ? toFound(data.code, data.format ?? "") : null);
+    waiting.delete(data.id);
+  };
+  return {
+    read: (image: ImageData) =>
+      new Promise<Found | null>((resolve) => {
+        if (hasFailed) return resolve(null);
+        const id = ++lastId;
+        waiting.set(id, resolve);
+        setTimeout(() => {
+          if (waiting.delete(id)) resolve(null);
+        }, WORKER_TIMEOUT_MS);
+        worker.postMessage({ id, image }, [image.data.buffer]);
+      }),
+    hasFailed: () => hasFailed,
+    stop: () => {
+      fail();
+      worker.terminate();
+    },
   };
 };
 
-export const createFrameReader = async () => (await nativeReader()) ?? zxingReader();
+type Reader = ReturnType<typeof createWorker>;
+
+/** Parts of the picture, tried in turn: the middle at full sharpness, everything made smaller, the centre enlarged for tiny or soft bars */
+const VIEWS = [
+  { width: 0.8, height: 0.5, maxSize: 1920, enlarge: 1 },
+  { width: 1, height: 1, maxSize: 1280, enlarge: 1 },
+  { width: 0.4, height: 0.3, maxSize: 1920, enlarge: 2.5 },
+];
+
+const grab = (canvas: HTMLCanvasElement, source: CanvasImageSource, width: number, height: number, view: (typeof VIEWS)[number]) => {
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context || !width || !height) return null;
+  // The long side of the frame on screen goes across, also when the phone is upright
+  const cropWidth = Math.round(width * (height > width ? Math.min(1, view.width * 1.2) : view.width));
+  const cropHeight = Math.round(height * view.height);
+  const scale = Math.min(view.enlarge, view.maxSize / Math.max(cropWidth, cropHeight));
+  canvas.width = Math.round(cropWidth * scale);
+  canvas.height = Math.round(cropHeight * scale);
+  context.imageSmoothingQuality = "high";
+  context.drawImage(source, (width - cropWidth) / 2, (height - cropHeight) / 2, cropWidth, cropHeight, 0, 0, canvas.width, canvas.height);
+  return context.getImageData(0, 0, canvas.width, canvas.height);
+};
+
+/** Loads while the camera opens. `watch` calls back once, with a sure read. */
+export const createScanner = () => {
+  const reader: Reader = createWorker();
+  const native = createNative();
+  let isStopped = false;
+
+  const watch = (video: HTMLVideoElement, onCode: (code: string) => void) => {
+    const seen = new Map<string, number>();
+    const report = (found: Found | null) => {
+      if (!found?.code || isStopped) return;
+      // A 12-digit UPC is the same code as the EAN with a leading 0: the two readers name it differently
+      const code = /^\d{12}$/.test(found.code) ? `0${found.code}` : found.code;
+      const times = (seen.get(code) ?? 0) + 1;
+      seen.set(code, times);
+      if (times >= (found.isWeak ? WEAK_SURE_AFTER : SURE_AFTER)) {
+        isStopped = true;
+        onCode(code);
+      }
+    };
+
+    const runNative = async () => {
+      const detector = await native;
+      let failures = 0;
+      while (detector && !isStopped && failures < MAX_NATIVE_FAILURES) {
+        try {
+          const [found] = await detector.detect(video);
+          failures = 0;
+          report(found ? toFound(found.rawValue, found.format) : null);
+        } catch {
+          failures += 1;
+        }
+        await wait(50);
+      }
+    };
+    const runWorker = async () => {
+      const canvas = document.createElement("canvas");
+      for (let turn = 0; !isStopped && !reader.hasFailed(); turn++) {
+        const image = grab(canvas, video, video.videoWidth, video.videoHeight, VIEWS[turn % VIEWS.length]);
+        if (image) report(await reader.read(image));
+        await wait(image ? 15 : 100);
+      }
+    };
+    runNative();
+    runWorker();
+  };
+
+  return {
+    watch,
+    stop: () => {
+      isStopped = true;
+      reader.stop();
+    },
+  };
+};
+
+/** Reads a photo, for when the live camera can't see the bars sharply enough */
+export const readPhoto = async (file: File) => {
+  const reader = createWorker();
+  try {
+    const bitmap = await createImageBitmap(file);
+    const canvas = document.createElement("canvas");
+    for (const view of VIEWS) {
+      const image = grab(canvas, bitmap, bitmap.width, bitmap.height, view);
+      const found = image && (await reader.read(image));
+      if (found) return found.code;
+    }
+    return null;
+  } finally {
+    reader.stop();
+  }
+};

@@ -1,8 +1,53 @@
 "use client";
 
-import { Flashlight, Loader2, X } from "lucide-react";
+import { Camera, Flashlight, Loader2, SwitchCamera, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
-import { createFrameReader } from "./read-barcode";
+import { createScanner, readPhoto } from "./read-barcode";
+
+/** The camera that worked last time on this device */
+const CAMERA_KEY = "scanner-camera";
+const HELP_AFTER_MS = 6000;
+
+const savedCamera = () => {
+  try {
+    return localStorage.getItem(CAMERA_KEY);
+  } catch {
+    return null;
+  }
+};
+const saveCamera = (id: string) => {
+  try {
+    localStorage.setItem(CAMERA_KEY, id);
+  } catch {
+    // Private window: not remembered
+  }
+};
+
+/** Small bars need many pixels */
+const SIZE = { width: { ideal: 1920 }, height: { ideal: 1080 } };
+
+const openCamera = async (cameraId: string | null) => {
+  const back = { facingMode: { ideal: "environment" }, ...SIZE };
+  if (cameraId) {
+    try {
+      return await navigator.mediaDevices.getUserMedia({ audio: false, video: { deviceId: { exact: cameraId }, ...SIZE } });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "NotAllowedError") throw error;
+      // Unplugged since: use the normal one
+    }
+  }
+  return navigator.mediaDevices.getUserMedia({ audio: false, video: back });
+};
+
+/** iPhones with several lenses: only these combined cameras focus close up */
+const closeUpCamera = (cameras: MediaDeviceInfo[]) =>
+  cameras.find((camera) => /back triple camera/i.test(camera.label)) ?? cameras.find((camera) => /back dual wide camera/i.test(camera.label));
+
+const keepFocusing = async (track: MediaStreamTrack) => {
+  const modes = (track.getCapabilities?.() as { focusMode?: string[] } | undefined)?.focusMode;
+  if (!modes?.includes("continuous")) return;
+  await track.applyConstraints({ advanced: [{ focusMode: "continuous" } as MediaTrackConstraintSet] }).catch(() => undefined);
+};
 
 interface ScannerDialogProps {
   onScan: (barcode: string) => void;
@@ -28,6 +73,14 @@ export function ScannerDialog({ onScan, onClose }: ScannerDialogProps) {
   const [error, setError] = useState("");
   const [hasTorch, setHasTorch] = useState(false);
   const [isTorchOn, setIsTorchOn] = useState(false);
+  const [cameras, setCameras] = useState<string[]>([]);
+  /** Chosen with the switch button; null: the best one */
+  const [cameraId, setCameraId] = useState<string | null>(null);
+  const [activeCamera, setActiveCamera] = useState("");
+  const [isMirrored, setIsMirrored] = useState(false);
+  const [needsHelp, setNeedsHelp] = useState(false);
+  const [isReadingPhoto, setIsReadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState("");
 
   useEffect(() => {
     onScanRef.current = onScan;
@@ -35,43 +88,50 @@ export function ScannerDialog({ onScan, onClose }: ScannerDialogProps) {
 
   useEffect(() => {
     if (!dialogRef.current?.open) dialogRef.current?.showModal();
+  }, []);
+
+  useEffect(() => {
     let isStopped = false;
     let stream: MediaStream | undefined;
-    let timer: ReturnType<typeof setTimeout>;
+    let helpTimer: ReturnType<typeof setTimeout>;
+    const scanner = createScanner();
 
     const start = async () => {
       try {
         if (!navigator.mediaDevices?.getUserMedia) throw new Error("No camera access");
-        const opened = await navigator.mediaDevices.getUserMedia({
-          audio: false,
-          video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
-        });
+        const wanted = cameraId ?? savedCamera();
+        let opened = await openCamera(wanted);
+        // Names are known only once the camera is allowed
+        const found = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === "videoinput");
+        const better = wanted ? undefined : closeUpCamera(found);
+        if (better && better.deviceId !== opened.getVideoTracks()[0].getSettings().deviceId) {
+          opened.getTracks().forEach((track) => track.stop());
+          opened = await openCamera(better.deviceId);
+        }
         // Closed while the permission question was open
         if (isStopped) return opened.getTracks().forEach((track) => track.stop());
         stream = opened;
         const video = videoRef.current!;
         video.srcObject = stream;
         await video.play();
+        if (isStopped) return;
         const track = stream.getVideoTracks()[0];
         trackRef.current = track;
+        const settings = track.getSettings();
+        setCameras(found.map((device) => device.deviceId));
+        setActiveCamera(settings.deviceId ?? "");
+        // A camera facing you is shown like a mirror, so it's easy to aim. The readers get the real picture.
+        setIsMirrored(settings.facingMode ? settings.facingMode === "user" : /facetime|front|integrated|webcam/i.test(track.label));
         setHasTorch(Boolean((track.getCapabilities?.() as { torch?: boolean } | undefined)?.torch));
+        setIsTorchOn(false);
         setIsReady(true);
-
-        const read = await createFrameReader();
-        let last = "";
-        const look = async () => {
-          if (isStopped) return;
-          const code = await read(video).catch(() => null);
-          if (isStopped) return;
-          // Two equal reads in a row, so a blurred frame can't give a wrong number
-          if (code && code === last) {
-            navigator.vibrate?.(80);
-            return onScanRef.current(code);
-          }
-          if (code) last = code;
-          timer = setTimeout(look, 120);
-        };
-        look();
+        helpTimer = setTimeout(() => setNeedsHelp(true), HELP_AFTER_MS);
+        keepFocusing(track);
+        scanner.watch(video, (code) => {
+          navigator.vibrate?.(80);
+          if (settings.deviceId) saveCamera(settings.deviceId);
+          onScanRef.current(code);
+        });
       } catch (problem) {
         if (!isStopped) setError(cameraError(problem));
       }
@@ -80,10 +140,27 @@ export function ScannerDialog({ onScan, onClose }: ScannerDialogProps) {
 
     return () => {
       isStopped = true;
-      clearTimeout(timer);
+      clearTimeout(helpTimer);
+      scanner.stop();
       stream?.getTracks().forEach((track) => track.stop());
     };
-  }, []);
+  }, [cameraId]);
+
+  const switchCamera = () => {
+    setIsReady(false);
+    setNeedsHelp(false);
+    setCameraId(cameras[(cameras.indexOf(activeCamera) + 1) % cameras.length]);
+  };
+
+  const takePhoto = async (file: File | undefined) => {
+    if (!file) return;
+    setPhotoError("");
+    setIsReadingPhoto(true);
+    const code = await readPhoto(file).catch(() => null);
+    setIsReadingPhoto(false);
+    if (code) onScanRef.current(code);
+    else setPhotoError("No barcode was found in the photo. Take it closer, sharp and in good light.");
+  };
 
   const toggleTorch = async () => {
     try {
@@ -113,8 +190,8 @@ export function ScannerDialog({ onScan, onClose }: ScannerDialogProps) {
             <X className="size-5" />
           </button>
         </div>
-        <div className="relative flex-1 bg-black sm:aspect-[4/3] sm:flex-none">
-          <video ref={videoRef} muted playsInline className="absolute inset-0 size-full object-cover" />
+        <div className="relative flex-1 overflow-hidden bg-black sm:aspect-[4/3] sm:flex-none">
+          <video ref={videoRef} muted playsInline className={`absolute inset-0 size-full object-cover ${isMirrored ? "-scale-x-100" : ""}`} />
           {isReady && (
             <div className="pointer-events-none absolute inset-x-8 top-1/2 h-36 -translate-y-1/2 rounded-xl border-2 border-white/90 shadow-[0_0_0_100vmax_rgba(0,0,0,0.45)]" />
           )}
@@ -129,19 +206,51 @@ export function ScannerDialog({ onScan, onClose }: ScannerDialogProps) {
             </p>
           )}
         </div>
-        <div className="flex min-h-16 items-center justify-center gap-3 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-sm">
-          {isReady && <span>Hold the barcode inside the frame. It&apos;s read automatically.</span>}
-          {hasTorch && (
-            <button
-              type="button"
-              onClick={toggleTorch}
-              aria-pressed={isTorchOn}
-              aria-label="Light"
-              className={`flex size-11 shrink-0 items-center justify-center rounded-full ${isTorchOn ? "bg-white text-gray-900" : "bg-white/15"}`}
-            >
-              <Flashlight className="size-5" />
-            </button>
-          )}
+        <div className="space-y-3 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-sm">
+          <p aria-live="polite" className="text-center">
+            {photoError ||
+              (isReady && needsHelp
+                ? "Not read yet? Hold it 15 to 25 cm away, flat, with good light, until the bars look sharp. Or use a photo."
+                : isReady && "Hold the barcode inside the frame. It's read automatically.")}
+          </p>
+          <div className="flex items-center justify-center gap-3">
+            <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full bg-white/15 px-4 font-medium hover:bg-white/25 focus-within:ring-2 focus-within:ring-white">
+              {isReadingPhoto ? <Loader2 className="size-5 animate-spin" aria-hidden /> : <Camera className="size-5" aria-hidden />}
+              Use a photo
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                disabled={isReadingPhoto}
+                className="sr-only"
+                onChange={(event) => {
+                  takePhoto(event.target.files?.[0]);
+                  event.target.value = "";
+                }}
+              />
+            </label>
+            {cameras.length > 1 && (
+              <button
+                type="button"
+                onClick={switchCamera}
+                aria-label="Use another camera"
+                className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white/15 hover:bg-white/25"
+              >
+                <SwitchCamera className="size-5" />
+              </button>
+            )}
+            {hasTorch && (
+              <button
+                type="button"
+                onClick={toggleTorch}
+                aria-pressed={isTorchOn}
+                aria-label="Light"
+                className={`flex size-11 shrink-0 items-center justify-center rounded-full ${isTorchOn ? "bg-white text-gray-900" : "bg-white/15"}`}
+              >
+                <Flashlight className="size-5" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </dialog>
