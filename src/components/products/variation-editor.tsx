@@ -301,7 +301,7 @@ function Quantity({ row, onChange, onStockChange, expiryRequired }: Pick<Variati
   };
 
   return (
-    <fieldset className="space-y-3 rounded-lg bg-gray-50 p-3 sm:p-4">
+    <fieldset className="min-w-0 space-y-3 rounded-lg bg-gray-50 p-3 sm:p-4">
       <legend className="sr-only">Quantity in stock</legend>
       {row.id && stock?.batches ? (
         <>
@@ -313,12 +313,12 @@ function Quantity({ row, onChange, onStockChange, expiryRequired }: Pick<Variati
                 {stock.expired > 0 && <span className="text-red-700"> · {stock.expired} expired</span>}
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <Button type="button" variant="secondary" onClick={() => setDialog("decrease")} disabled={stock.onHand === 0}>
+            <div className="flex w-full items-center justify-between gap-2 sm:w-auto">
+              <Button type="button" variant="secondary" className="px-3" onClick={() => setDialog("decrease")} disabled={stock.onHand === 0}>
                 <Minus className="size-4" aria-hidden /> Decrease
               </Button>
-              <output className={`min-w-12 text-center text-lg font-semibold ${stock.onHand ? "text-gray-900" : "text-red-700"}`}>{stock.onHand}</output>
-              <Button type="button" variant="secondary" onClick={() => setDialog("increase")}>
+              <output className={`min-w-8 text-center text-lg font-semibold ${stock.onHand ? "text-gray-900" : "text-red-700"}`}>{stock.onHand}</output>
+              <Button type="button" variant="secondary" className="px-3" onClick={() => setDialog("increase")}>
                 <Plus className="size-4" aria-hidden /> Increase
               </Button>
             </div>
