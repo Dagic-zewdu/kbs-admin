@@ -36,7 +36,7 @@ export const navSections: NavSection[] = [
       { label: "Products", href: "/products", icon: Package },
       { label: "Categories", href: "/categories", icon: FolderTree },
       { label: "Brands", href: "/brands", icon: Tag },
-      { label: "Inventory", href: "/inventory", icon: Boxes, comingSoon: true },
+      { label: "Inventory", href: "/inventory", icon: Boxes },
     ],
   },
   {

@@ -6,6 +6,9 @@ export const missingLabels: Record<string, string> = {
   brand: "brand",
   category: "category",
   photo: "a photo",
+  barcode: "a barcode for every variation",
+  price: "a price for every variation",
+  stock: "stock",
   shortDescription: "short description",
   description: "full description",
 };

@@ -1,5 +1,6 @@
 import type { AdvisorCompleteness, AdvisorProfile, IngredientAnalysis, ProductIngredient } from "./advisor";
 import type { Brand } from "./brand";
+import type { ReceiveBatch, VariationStock } from "./inventory";
 import type { Category } from "./category";
 
 export type ProductStatus = "draft" | "private" | "live" | "archived";
@@ -17,6 +18,10 @@ export interface ProductSummary {
   mainPhotoUrl: string | null;
   variationType: VariationType;
   variationsCount: number;
+  priceFrom: number | null;
+  priceTo: number | null;
+  /** Units that can be sold */
+  onHand: number;
   /** What is still needed before it can go live */
   missingToGoLive: string[];
   createdAt: string;
@@ -30,6 +35,11 @@ export interface ProductVariation {
   sizeUnit: SizeUnit | null;
   shadeHex: string | null;
   barcode: string | null;
+  sku: string;
+  price: number | null;
+  compareAtPrice: number | null;
+  lowStockLevel: number;
+  stock: VariationStock;
 }
 
 export interface ProductPhoto {
@@ -83,7 +93,7 @@ export interface SaveProductRequest {
   advisor: AdvisorProfile;
   attributes: Record<string, AttributeValue>;
   variationType: VariationType;
-  variations: (Omit<ProductVariation, "id"> & { id?: string })[];
+  variations: (Omit<ProductVariation, "id" | "stock" | "sku"> & { id?: string; sku: string | null; newBatch?: ReceiveBatch })[];
   photoFileIds: string[];
 }
 

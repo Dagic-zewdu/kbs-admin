@@ -11,6 +11,8 @@ export interface Category {
   /** Names from the main category down, e.g. ["Skincare", "Cleansers"] */
   path: string[];
   depth: number;
+  /** false = its products don't expire (tools) */
+  expiryRequired: boolean;
   /** Suggested routine step for its products */
   defaultRoutineStep: string | null;
   sortOrder: number;

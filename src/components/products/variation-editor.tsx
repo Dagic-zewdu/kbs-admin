@@ -1,7 +1,13 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import { Boxes, Plus, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { BarcodeField } from "@/components/barcode/barcode-field";
+import { BatchFields, emptyBatch, Field, type BatchForm } from "@/components/inventory/batch-fields";
 import { Button } from "@/components/ui/button";
+import { formatDay } from "@/lib/labels";
+import { decimalText, wholeText } from "@/lib/numbers";
+import type { VariationStock } from "@/types/inventory";
 import type { SizeUnit, VariationType } from "@/types/product";
 
 /** A row while editing: text fields stay text until saving */
@@ -13,6 +19,14 @@ export interface VariationRow {
   sizeUnit: SizeUnit;
   shadeHex: string;
   barcode: string;
+  sku: string;
+  price: string;
+  compareAtPrice: string;
+  lowStockLevel: string;
+  /** Saved stock; undefined for a new variation */
+  stock?: VariationStock;
+  /** Stock received now, saved as a batch */
+  newBatch: BatchForm;
 }
 
 let nextKey = 1;
@@ -23,6 +37,11 @@ export const emptyVariation = (): VariationRow => ({
   sizeUnit: "ml",
   shadeHex: "",
   barcode: "",
+  sku: "",
+  price: "",
+  compareAtPrice: "",
+  lowStockLevel: "5",
+  newBatch: emptyBatch,
 });
 
 const types: { value: VariationType; label: string; hint: string }[] = [
@@ -42,14 +61,17 @@ const nameLabels: Partial<Record<VariationType, { label: string; placeholder: st
 const units: SizeUnit[] = ["ml", "g", "oz", "pcs", "sheets"];
 const inputClasses =
   "h-11 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 sm:h-10";
+const fullWidth = `${inputClasses} w-full min-w-0`;
 
 interface VariationEditorProps {
   type: VariationType;
   rows: VariationRow[];
   onChange: (type: VariationType, rows: VariationRow[]) => void;
+  productId?: string;
+  expiryRequired: boolean;
 }
 
-export function VariationEditor({ type, rows, onChange }: VariationEditorProps) {
+export function VariationEditor({ type, rows, onChange, productId, expiryRequired }: VariationEditorProps) {
   const changeType = (next: VariationType) => {
     // No options = exactly one row
     const kept = next === "none" ? rows.slice(0, 1) : rows;
@@ -57,8 +79,10 @@ export function VariationEditor({ type, rows, onChange }: VariationEditorProps) 
     onChange(next, type === "size" ? kept.map((row) => ({ ...row, name: "" })) : kept);
   };
   const changeRow = (key: string, change: Partial<VariationRow>) =>
-    onChange(type, rows.map((row) => (row.key === key ? { ...row, ...change } : row)));
-  const nameField = nameLabels[type];
+    onChange(
+      type,
+      rows.map((row) => (row.key === key ? { ...row, ...change } : row)),
+    );
   const losesRows = type !== "none" && rows.length > 1;
 
   return (
@@ -87,85 +111,36 @@ export function VariationEditor({ type, rows, onChange }: VariationEditorProps) 
         {losesRows && <p className="mt-1.5 text-xs text-gray-500">Remove variations until one is left to choose “No options”.</p>}
       </fieldset>
 
-      <ul className="space-y-3">
+      <ul className="space-y-4">
         {rows.map((row, index) => (
-          <li key={row.key} className="rounded-xl border border-gray-200 p-3 sm:p-4">
+          <li key={row.key} className="space-y-4 rounded-xl border border-gray-200 p-3 sm:p-4">
             {type !== "none" && (
-              <div className="mb-2 flex items-center justify-between">
+              <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Variation {index + 1}</span>
                 <button
                   type="button"
                   aria-label={`Remove variation ${index + 1}`}
-                  disabled={rows.length === 1}
-                  onClick={() => onChange(type, rows.filter((item) => item.key !== row.key))}
+                  title={row.stock?.batches ? "It has stock, so it can't be removed" : undefined}
+                  disabled={rows.length === 1 || Boolean(row.stock?.batches)}
+                  onClick={() =>
+                    onChange(
+                      type,
+                      rows.filter((item) => item.key !== row.key),
+                    )
+                  }
                   className="flex size-9 items-center justify-center rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-700 disabled:opacity-30"
                 >
                   <Trash2 className="size-4" />
                 </button>
               </div>
             )}
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {nameField && (
-                <label className="space-y-1.5">
-                  <span className="block text-sm font-medium text-gray-700">{nameField.label}</span>
-                  <span className="flex gap-2">
-                    <input
-                      value={row.name}
-                      onChange={(event) => changeRow(row.key, { name: event.target.value })}
-                      placeholder={nameField.placeholder}
-                      maxLength={80}
-                      className={`${inputClasses} w-full min-w-0`}
-                    />
-                    {type === "shade" && (
-                      <input
-                        type="color"
-                        aria-label="Shade colour"
-                        title={row.shadeHex ? "Shade colour" : "Choose the shade colour"}
-                        value={row.shadeHex || "#ffffff"}
-                        onChange={(event) => changeRow(row.key, { shadeHex: event.target.value })}
-                        className="h-11 w-12 shrink-0 cursor-pointer rounded-lg border border-gray-300 bg-white p-1 sm:h-10"
-                      />
-                    )}
-                  </span>
-                </label>
-              )}
-              <div className="space-y-1.5">
-                <span className="block text-sm font-medium text-gray-700">{type === "size" ? "Size" : "Size (optional)"}</span>
-                <div className="flex gap-2">
-                  <input
-                    aria-label="Size"
-                    inputMode="decimal"
-                    value={row.sizeValue}
-                    onChange={(event) => changeRow(row.key, { sizeValue: event.target.value.replace(",", ".").replace(/[^\d.]/g, "") })}
-                    placeholder="150"
-                    className={`${inputClasses} w-full min-w-0`}
-                  />
-                  <select
-                    aria-label="Unit"
-                    value={row.sizeUnit}
-                    onChange={(event) => changeRow(row.key, { sizeUnit: event.target.value as SizeUnit })}
-                    className={`${inputClasses} w-24 shrink-0`}
-                  >
-                    {units.map((unit) => (
-                      <option key={unit}>{unit}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <label className="space-y-1.5">
-                <span className="block text-sm font-medium text-gray-700">Barcode (optional)</span>
-                <input
-                  value={row.barcode}
-                  onChange={(event) => changeRow(row.key, { barcode: event.target.value })}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") event.preventDefault(); // barcode scanners press Enter
-                  }}
-                  placeholder="8809416470009"
-                  maxLength={40}
-                  className={`${inputClasses} w-full min-w-0`}
-                />
-              </label>
-            </div>
+            <VariationFields
+              type={type}
+              row={row}
+              onChange={(change) => changeRow(row.key, change)}
+              productId={productId}
+              expiryRequired={expiryRequired}
+            />
           </li>
         ))}
       </ul>
@@ -176,5 +151,135 @@ export function VariationEditor({ type, rows, onChange }: VariationEditorProps) 
         </Button>
       )}
     </div>
+  );
+}
+
+interface VariationFieldsProps {
+  type: VariationType;
+  row: VariationRow;
+  onChange: (change: Partial<VariationRow>) => void;
+  productId?: string;
+  expiryRequired: boolean;
+}
+
+function VariationFields({ type, row, onChange, productId, expiryRequired }: VariationFieldsProps) {
+  const nameField = nameLabels[type];
+  return (
+    <>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {nameField && (
+          <Field label={nameField.label}>
+            <span className="flex gap-2">
+              <input
+                value={row.name}
+                onChange={(event) => onChange({ name: event.target.value })}
+                placeholder={nameField.placeholder}
+                maxLength={80}
+                className={fullWidth}
+              />
+              {type === "shade" && (
+                <input
+                  type="color"
+                  aria-label="Shade colour"
+                  title={row.shadeHex ? "Shade colour" : "Choose the shade colour"}
+                  value={row.shadeHex || "#ffffff"}
+                  onChange={(event) => onChange({ shadeHex: event.target.value })}
+                  className="h-11 w-12 shrink-0 cursor-pointer rounded-lg border border-gray-300 bg-white p-1 sm:h-10"
+                />
+              )}
+            </span>
+          </Field>
+        )}
+        <div className="space-y-1.5">
+          <span className="block text-sm font-medium text-gray-700">{type === "size" ? "Size" : "Size (optional)"}</span>
+          <div className="flex gap-2">
+            <input
+              aria-label="Size"
+              inputMode="decimal"
+              value={row.sizeValue}
+              onChange={(event) => onChange({ sizeValue: decimalText(event.target.value) })}
+              placeholder="150"
+              className={fullWidth}
+            />
+            <select
+              aria-label="Unit"
+              value={row.sizeUnit}
+              onChange={(event) => onChange({ sizeUnit: event.target.value as SizeUnit })}
+              className={`${inputClasses} w-24 shrink-0`}
+            >
+              {units.map((unit) => (
+                <option key={unit}>{unit}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <BarcodeField value={row.barcode} onChange={(barcode) => onChange({ barcode })} productId={productId} />
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Field label="Price, ETB">
+          <input
+            inputMode="decimal"
+            value={row.price}
+            onChange={(event) => onChange({ price: decimalText(event.target.value) })}
+            placeholder="1450"
+            className={fullWidth}
+          />
+        </Field>
+        <Field label="Old price (optional)">
+          <input
+            inputMode="decimal"
+            value={row.compareAtPrice}
+            onChange={(event) => onChange({ compareAtPrice: decimalText(event.target.value) })}
+            placeholder="1700"
+            className={fullWidth}
+          />
+        </Field>
+        <Field label="SKU">
+          <input
+            value={row.sku}
+            onChange={(event) => onChange({ sku: event.target.value.toUpperCase() })}
+            placeholder="Created for you"
+            maxLength={50}
+            className={fullWidth}
+          />
+        </Field>
+        <Field label="Low-stock alert at">
+          <input
+            inputMode="numeric"
+            value={row.lowStockLevel}
+            onChange={(event) => onChange({ lowStockLevel: wholeText(event.target.value).slice(0, 6) })}
+            placeholder="5"
+            className={fullWidth}
+          />
+        </Field>
+      </div>
+
+      {row.stock?.batches ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-gray-50 p-3 text-sm">
+          <span className="text-gray-700">
+            <strong className="font-semibold text-gray-900">{row.stock.onHand}</strong> in stock
+            {row.stock.nextExpiry && <> · expires {formatDay(row.stock.nextExpiry)}</>}
+            {row.stock.expired > 0 && <span className="text-red-700"> · {row.stock.expired} expired</span>}
+          </span>
+          <Link href={`/inventory/${row.id}`} className="inline-flex min-h-9 items-center gap-1.5 font-medium text-brand-700 hover:underline">
+            <Boxes className="size-4" aria-hidden /> Manage stock
+          </Link>
+        </div>
+      ) : (
+        <fieldset className="rounded-lg bg-gray-50 p-3 sm:p-4">
+          <legend className="sr-only">First stock</legend>
+          <p aria-hidden className="mb-2 text-sm font-semibold text-gray-900">
+            First stock
+          </p>
+          <BatchFields
+            value={row.newBatch}
+            expiryRequired={expiryRequired}
+            onChange={(change) => onChange({ newBatch: { ...row.newBatch, ...change } })}
+          />
+        </fieldset>
+      )}
+    </>
   );
 }

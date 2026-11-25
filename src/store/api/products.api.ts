@@ -29,15 +29,28 @@ export const productsApi = baseApi.injectEndpoints({
     }),
     createProduct: build.mutation<ApiResponse<Product>, SaveProductRequest>({
       query: (body) => ({ url: "/admin/products", method: "POST", body }),
-      invalidatesTags: ["Products"],
+      invalidatesTags: ["Products", "Inventory"],
     }),
     updateProduct: build.mutation<ApiResponse<Product>, SaveProductRequest & { id: string }>({
       query: ({ id, ...body }) => ({ url: `/admin/products/${id}`, method: "PATCH", body }),
-      invalidatesTags: (_result, _error, { id }) => ["Products", { type: "Product", id }],
+      invalidatesTags: (_result, _error, { id }) => ["Products", "Inventory", { type: "Product", id }],
+    }),
+    /** Go live, hide (private), archive */
+    changeProductStatus: build.mutation<ApiResponse<Product>, { id: string; status: "live" | "private" | "archived" }>({
+      query: ({ id, status }) => ({ url: `/admin/products/${id}/status`, method: "PATCH", body: { status } }),
+      invalidatesTags: (_result, _error, { id }) => ["Products", "Inventory", { type: "Product", id }],
+    }),
+    getProductByBarcode: build.query<ApiResponse<{ variationId: string; product: Product }>, string>({
+      query: (barcode) => `/admin/products/barcode/${encodeURIComponent(barcode)}`,
+      keepUnusedDataFor: 0,
+    }),
+    /** For an item without a barcode on its package */
+    createInternalBarcode: build.mutation<ApiResponse<{ barcode: string }>, void>({
+      query: () => ({ url: "/admin/products/internal-barcode", method: "POST" }),
     }),
     deleteProduct: build.mutation<ApiResponse<null>, string>({
       query: (id) => ({ url: `/admin/products/${id}`, method: "DELETE" }),
-      invalidatesTags: ["Products"],
+      invalidatesTags: ["Products", "Inventory"],
     }),
     getAdvisorOptions: build.query<ApiResponse<AdvisorOptions>, void>({
       query: () => "/admin/products/advisor-options",
@@ -71,6 +84,9 @@ export const {
   useCreateProductMutation,
   useUpdateProductMutation,
   useDeleteProductMutation,
+  useChangeProductStatusMutation,
+  useGetProductByBarcodeQuery,
+  useCreateInternalBarcodeMutation,
   useListCategoryFieldsQuery,
   useGetAdvisorOptionsQuery,
   usePreviewIngredientsQuery,

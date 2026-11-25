@@ -1,17 +1,23 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import clsx from "clsx";
+import { ArrowLeft, ArrowRight, Check, CircleAlert, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { BarcodeField } from "@/components/barcode/barcode-field";
 import { BrandSelect } from "@/components/brands/brand-select";
 import { CategorySelect } from "@/components/categories/category-select";
+import { emptyBatch, toReceiveBatch } from "@/components/inventory/batch-fields";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage } from "@/lib/api-error";
+import { formatPrice } from "@/lib/labels";
+import { toNumber } from "@/lib/numbers";
 import {
+  useChangeProductStatusMutation,
   useCreateProductMutation,
   useDeleteProductMutation,
   useGetAdvisorOptionsQuery,
@@ -52,15 +58,59 @@ const toForm = (product?: Product) => ({
     sizeUnit: variation.sizeUnit ?? "ml",
     shadeHex: variation.shadeHex ?? "",
     barcode: variation.barcode ?? "",
+    sku: variation.sku,
+    price: variation.price === null ? "" : String(variation.price),
+    compareAtPrice: variation.compareAtPrice === null ? "" : String(variation.compareAtPrice),
+    lowStockLevel: String(variation.lowStockLevel),
+    stock: variation.stock,
+    newBatch: emptyBatch,
   })) ?? [emptyVariation()]) as VariationRow[],
   photos: (product?.photos ?? []) as ProductPhoto[],
 });
 
 type FormState = ReturnType<typeof toForm>;
 
-function Section({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
+const steps = [
+  { id: "basics", label: "Basics" },
+  { id: "photos", label: "Photos" },
+  { id: "variations", label: "Price & stock" },
+  { id: "description", label: "Description" },
+  { id: "ingredients", label: "Ingredients" },
+  { id: "advisor", label: "Advisor" },
+  { id: "review", label: "Review" },
+] as const;
+type StepId = (typeof steps)[number]["id"];
+
+/** Where each missing thing is filled in */
+const stepOfMissing: Record<string, StepId> = {
+  brand: "basics",
+  category: "basics",
+  barcode: "variations",
+  photo: "photos",
+  price: "variations",
+  stock: "variations",
+  shortDescription: "description",
+  description: "description",
+};
+
+/** What is missing to go live, from what is typed now */
+const missingNow = (form: FormState) => {
+  const missing: string[] = [];
+  if (!form.brand) missing.push("brand");
+  if (!form.category) missing.push("category");
+  if (!form.photos.length) missing.push("photo");
+  if (form.variations.some((row) => !row.barcode.trim())) missing.push("barcode");
+  if (form.variations.some((row) => !(Number(row.price) > 0))) missing.push("price");
+  if (!form.variations.some((row) => row.stock?.batches || Number(row.newBatch.quantity) > 0)) missing.push("stock");
+  if (!form.shortDescription.trim()) missing.push("shortDescription");
+  if (!form.description.trim()) missing.push("description");
+  return missing;
+};
+
+/** Hidden steps stay mounted, so nothing typed is lost */
+function Section({ title, description, shown, children }: { title: string; description: string; shown: boolean; children: React.ReactNode }) {
   return (
-    <section className="space-y-4 rounded-xl border border-gray-200 bg-white p-4 sm:p-6">
+    <section hidden={!shown} className="space-y-4 rounded-xl border border-gray-200 bg-white p-4 sm:p-6">
       <div>
         <h2 className="text-base font-semibold text-gray-900">{title}</h2>
         <p className="mt-0.5 text-sm text-gray-500">{description}</p>
@@ -70,7 +120,7 @@ function Section({ title, description, children }: { title: string; description:
   );
 }
 
-/** Create or edit a product. Saved as a draft; only the name is required. */
+/** Create or edit a product, step by step. Saved as a draft at any step; only the name is required. */
 export function ProductForm({ product }: { product?: Product }) {
   const router = useRouter();
   const [form, setForm] = useState<FormState>(() => toForm(product));
@@ -83,8 +133,15 @@ export function ProductForm({ product }: { product?: Product }) {
   const [update, updateState] = useUpdateProductMutation();
   const [remove, removeState] = useDeleteProductMutation();
   const advisorOptions = useGetAdvisorOptionsQuery().data?.data;
-  const isSaving = createState.isLoading || updateState.isLoading;
-  const error = createState.error || updateState.error;
+  const [changeStatus, statusState] = useChangeProductStatusMutation();
+  const isSaving = createState.isLoading || updateState.isLoading || statusState.isLoading;
+  const error = createState.error || updateState.error || statusState.error;
+  const [step, setStep] = useState<StepId>("basics");
+  const stepIndex = steps.findIndex((item) => item.id === step);
+  const goTo = (id: StepId) => {
+    setStep(id);
+    window.scrollTo({ top: 0 });
+  };
 
   const change = (values: Partial<FormState>) => {
     setForm((current) => ({ ...current, ...values }));
@@ -104,11 +161,38 @@ export function ProductForm({ product }: { product?: Product }) {
     return () => window.removeEventListener("beforeunload", warn);
   }, [isDirty]);
 
-  const save = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const expiryRequired = form.category?.expiryRequired ?? true;
+
+  /** What is wrong before anything is sent, and the step to fix it */
+  const findProblem = (): { step: StepId; message: string } | null => {
+    if (form.name.trim().length < 2) return { step: "basics", message: "Enter the product name." };
+    for (const row of form.variations) {
+      if (row.sizeValue && !(Number(row.sizeValue) > 0)) return { step: "variations", message: `“${row.sizeValue}” is not a valid size.` };
+      if (row.price && !(Number(row.price) > 0)) return { step: "variations", message: "A price must be more than 0." };
+      if (row.compareAtPrice && !(Number(row.compareAtPrice) > Number(row.price))) {
+        return { step: "variations", message: "The old price must be higher than the price." };
+      }
+      const { quantity, ...details } = row.newBatch;
+      if (!row.stock?.batches && !Number(quantity) && Object.values(details).some(Boolean)) {
+        return { step: "variations", message: "Enter the quantity of the first stock." };
+      }
+      if (!row.stock?.batches && Number(quantity) > 0 && expiryRequired && !details.expiryDate) {
+        return { step: "variations", message: "Enter the expiry date of the first stock." };
+      }
+    }
+    return null;
+  };
+
+  const save = async (thenLive: boolean) => {
     setNotice("");
-    const badSize = form.variations.find((row) => row.sizeValue && !(Number(row.sizeValue) > 0));
-    if (badSize) return setLocalError(`“${badSize.sizeValue}” is not a valid size.`);
+    createState.reset();
+    updateState.reset();
+    statusState.reset();
+    const problem = findProblem();
+    if (problem) {
+      setLocalError(problem.message);
+      return goTo(problem.step);
+    }
     setLocalError("");
 
     const body = {
@@ -134,23 +218,26 @@ export function ProductForm({ product }: { product?: Product }) {
         sizeUnit: row.sizeValue ? row.sizeUnit : null,
         shadeHex: row.shadeHex || null,
         barcode: row.barcode.trim() || null,
+        sku: row.sku.trim() || null,
+        price: toNumber(row.price),
+        compareAtPrice: toNumber(row.compareAtPrice),
+        lowStockLevel: Number(row.lowStockLevel || 0),
+        newBatch: !row.stock?.batches && Number(row.newBatch.quantity) > 0 ? toReceiveBatch(row.newBatch) : undefined,
       })),
       photoFileIds: form.photos.map((photo) => photo.fileId),
     };
 
-    if (product) {
-      const result = await update({ id: product.id, ...body });
-      if (!result.data) return;
-      // New variations now have ids, and sizes their names
-      setForm(toForm(result.data.data));
-      setIsDirty(false);
-      setNotice("Saved.");
-    } else {
-      const result = await create(body);
-      if (!result.data) return;
-      setIsDirty(false);
-      router.replace(`/products/${result.data.data.id}?created=1`);
-    }
+    const saved = product ? await update({ id: product.id, ...body }) : await create(body);
+    if (!saved.data) return;
+    const { id } = saved.data.data;
+    // New variations now have ids, SKUs and stock: saving again must not add the stock twice
+    setForm(toForm(saved.data.data));
+    setIsDirty(false);
+
+    const live = thenLive ? await changeStatus({ id, status: "live" }) : undefined;
+    if (!product) return router.replace(`/products/${id}?${live?.data ? "live" : "created"}=1`);
+    if (thenLive && !live?.data) return;
+    setNotice(thenLive ? "Saved. It's live in the shop." : "Saved.");
   };
 
   // The category suggests the routine step, unless staff chose one
@@ -161,19 +248,54 @@ export function ProductForm({ product }: { product?: Product }) {
       advisor: { ...form.advisor, routineStep: form.advisor.routineStep ?? category?.defaultRoutineStep ?? null },
     });
 
-  const missing = product?.missingToGoLive ?? [];
+  const missing = missingNow(form);
+  const firstRow = form.variations[0];
+  const stepHasMissing = (id: StepId) => missing.some((item) => stepOfMissing[item] === id);
+  const canGoLive = product?.status !== "live";
 
   return (
     <>
-      <form onSubmit={save} className="space-y-5">
-        {product && missing.length > 0 && !isDirty && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
-            <span className="font-medium">Still needed to go live:</span> {missing.map((item) => missingLabels[item] ?? item).join(", ")}.
-          </div>
-        )}
+      <form
+        noValidate
+        onSubmit={(event) => {
+          event.preventDefault();
+          save(false);
+        }}
+        className="space-y-5"
+      >
+        <nav aria-label="Steps" className="scrollbar-none -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+          <ol className="flex gap-1.5">
+            {steps.map((item, index) => (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  aria-current={step === item.id ? "step" : undefined}
+                  onClick={() => goTo(item.id)}
+                  className={clsx(
+                    "flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-sm font-medium",
+                    step === item.id ? "border-brand-600 bg-brand-600 text-white" : "border-gray-200 bg-white text-gray-700 hover:border-brand-300",
+                  )}
+                >
+                  <span className="text-xs opacity-70">{index + 1}</span> {item.label}
+                  {stepHasMissing(item.id) && (
+                    <span className={clsx("size-2 rounded-full", step === item.id ? "bg-white" : "bg-amber-500")} title="Something is needed to go live" />
+                  )}
+                </button>
+              </li>
+            ))}
+          </ol>
+        </nav>
 
-        <Section title="Basics" description="Only the name is needed to save a draft.">
-          <Input label="Product name" placeholder="Low pH Good Morning Gel Cleanser" required minLength={2} maxLength={200} {...field("name")} />
+        <Section shown={step === "basics"} title="Basics" description="Scan the barcode first. Only the name is needed to save a draft.">
+          {form.variationType === "none" && (
+            <BarcodeField
+              prominent
+              value={firstRow.barcode}
+              productId={product?.id}
+              onChange={(barcode) => change({ variations: [{ ...firstRow, barcode }] })}
+            />
+          )}
+          <Input label="Product name" placeholder="Low pH Good Morning Gel Cleanser" maxLength={200} {...field("name")} />
           <div className="grid gap-4 md:grid-cols-2">
             <BrandSelect label="Brand" value={form.brand} onChange={(brand) => change({ brand })} />
             <CategorySelect label="Category" value={form.category} onChange={chooseCategory} />
@@ -187,7 +309,7 @@ export function ProductForm({ product }: { product?: Product }) {
           )}
         </Section>
 
-        <Section title="Photos" description="Front, back and texture. The first photo is the main one.">
+        <Section shown={step === "photos"} title="Photos" description="Front, back and texture. The first photo is the main one.">
           <PhotoManager
             photos={form.photos}
             onChange={(updatePhotos) => {
@@ -199,15 +321,17 @@ export function ProductForm({ product }: { product?: Product }) {
           />
         </Section>
 
-        <Section title="Variations" description="Each version the customer can buy has its own barcode, and later its own price and stock.">
+        <Section shown={step === "variations"} title="Price and stock" description="Each version the customer can buy has its own barcode, price and stock.">
           <VariationEditor
             type={form.variationType}
             rows={form.variations}
+            productId={product?.id}
+            expiryRequired={expiryRequired}
             onChange={(variationType, variations) => change({ variationType, variations })}
           />
         </Section>
 
-        <Section title="Description" description="What the customer reads.">
+        <Section shown={step === "description"} title="Description" description="What the customer reads.">
           <Textarea label="Short description" rows={2} placeholder="One or two lines for the product card" maxLength={300} {...field("shortDescription")} />
           <Textarea label="Full description" rows={6} maxLength={10000} {...field("description")} />
           <Textarea label="How to use (optional)" rows={3} maxLength={3000} {...field("howToUse")} />
@@ -216,7 +340,7 @@ export function ProductForm({ product }: { product?: Product }) {
 
         {advisorOptions && (
           <>
-            <Section title="Ingredients" description="Warnings and don't-combine rules are worked out from the list.">
+            <Section shown={step === "ingredients"} title="Ingredients" description="Warnings and don't-combine rules are worked out from the list.">
               <IngredientsSection
                 options={advisorOptions}
                 text={form.ingredientsText}
@@ -226,7 +350,7 @@ export function ProductForm({ product }: { product?: Product }) {
               />
             </Section>
 
-            <Section title="Advisor details" description="Helps the AI advisor recommend this product to the right customers.">
+            <Section shown={step === "advisor"} title="Advisor details" description="Helps the AI advisor recommend this product to the right customers.">
               <AdvisorSection
                 key={product?.updatedAt}
                 options={advisorOptions}
@@ -238,19 +362,82 @@ export function ProductForm({ product }: { product?: Product }) {
           </>
         )}
 
+        <Section shown={step === "review"} title="Review" description="Check the product before customers see it.">
+          <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+            {[
+              ["Name", form.name],
+              ["Brand", form.brand?.name],
+              ["Category", form.category?.path.join(" › ")],
+              ["Photos", form.photos.length ? `${form.photos.length}` : ""],
+              ["Advisor details", `${product?.advisorCompleteness.percent ?? 0}% when last saved`],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <dt className="text-gray-500">{label}</dt>
+                <dd className="break-words font-medium text-gray-900">{value || "—"}</dd>
+              </div>
+            ))}
+          </dl>
+          <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200 text-sm">
+            {form.variations.map((row) => (
+              <li key={row.key} className="flex flex-wrap justify-between gap-x-4 gap-y-1 p-3">
+                <span className="font-medium text-gray-900">
+                  {row.name || (row.sizeValue ? `${row.sizeValue} ${row.sizeUnit}` : "One version")}
+                  <span className="block font-normal text-gray-500">{row.barcode || "No barcode"}</span>
+                </span>
+                <span className="text-right text-gray-900">
+                  {formatPrice(toNumber(row.price))}
+                  <span className="block text-gray-500">{row.stock?.batches ? row.stock.onHand : Number(row.newBatch.quantity || 0)} in stock</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          {missing.length > 0 ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              <p className="flex items-center gap-2 font-medium">
+                <CircleAlert className="size-4 shrink-0" aria-hidden /> Still needed to go live
+              </p>
+              <ul className="mt-2 space-y-1">
+                {missing.map((item) => (
+                  <li key={item}>
+                    <button type="button" onClick={() => goTo(stepOfMissing[item])} className="min-h-8 text-left font-medium underline first-letter:uppercase">
+                      {missingLabels[item] ?? item}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+              <Check className="size-4 shrink-0" aria-hidden />
+              {canGoLive ? "Everything is there. It can go live." : "It's live in the shop."}
+            </p>
+          )}
+          {canGoLive && product?.status !== "archived" && (
+            <Button type="button" onClick={() => save(true)} disabled={missing.length > 0 || isUploading} isLoading={isSaving} className="w-full sm:w-auto">
+              Save and go live
+            </Button>
+          )}
+        </Section>
+
         {(localError || error) && <Alert>{localError || getErrorMessage(error)}</Alert>}
         {notice && <Alert type="success">{notice}</Alert>}
 
-        <div className="flex flex-col-reverse gap-2 rounded-xl border border-gray-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
-          {product?.status === "draft" ? (
-            <Button type="button" variant="ghost" onClick={() => setIsDeleting(true)} className="text-red-700 hover:bg-red-50">
-              <Trash2 className="size-4" aria-hidden /> Delete draft
+        <div className="flex flex-col gap-2 rounded-xl border border-gray-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="grid grid-cols-2 gap-2 sm:flex">
+            <Button type="button" variant="secondary" disabled={stepIndex === 0} onClick={() => goTo(steps[stepIndex - 1].id)}>
+              <ArrowLeft className="size-4" aria-hidden /> Back
             </Button>
-          ) : (
-            <span />
-          )}
+            <Button type="button" variant="secondary" disabled={stepIndex === steps.length - 1} onClick={() => goTo(steps[stepIndex + 1].id)}>
+              Next <ArrowRight className="size-4" aria-hidden />
+            </Button>
+          </div>
           <div className="flex flex-col-reverse gap-2 sm:flex-row">
-            <Button type="button" variant="secondary" onClick={() => router.push("/products")}>
+            {product?.status === "draft" && (
+              <Button type="button" variant="ghost" onClick={() => setIsDeleting(true)} className="text-red-700 hover:bg-red-50">
+                <Trash2 className="size-4" aria-hidden /> Delete draft
+              </Button>
+            )}
+            <Button type="button" variant="ghost" onClick={() => router.push("/products")}>
               {isDirty ? "Cancel" : "Back to products"}
             </Button>
             <Button type="submit" isLoading={isSaving} disabled={isUploading}>
@@ -258,7 +445,6 @@ export function ProductForm({ product }: { product?: Product }) {
             </Button>
           </div>
         </div>
-
       </form>
 
         {/* Outside the form: the dialog has its own form */}
@@ -292,7 +478,7 @@ function DeleteDialog(props: {
       open={props.open}
       tone="danger"
       title={`Delete ${props.name}?`}
-      description="The draft and its photos and variations are removed. This can't be undone."
+      description="The draft, its photos, variations and stock are removed. This can't be undone."
       confirmLabel="Delete draft"
       isLoading={props.isLoading}
       error={props.error || undefined}

@@ -9,7 +9,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/pagination";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { getErrorMessage } from "@/lib/api-error";
-import { formatDate } from "@/lib/labels";
+import { formatDate, formatPrice } from "@/lib/labels";
 import { useListCategoriesQuery } from "@/store/api/categories.api";
 import { useListProductsQuery, type ListProductsRequest } from "@/store/api/products.api";
 import { categoryPath } from "@/types/category";
@@ -32,6 +32,9 @@ function MainPhoto({ product, className }: { product: ProductSummary; className:
     </span>
   );
 }
+
+const priceText = ({ priceFrom, priceTo }: ProductSummary) =>
+  priceFrom !== null && priceTo !== null && priceFrom !== priceTo ? `${formatPrice(priceFrom)} – ${formatPrice(priceTo)}` : formatPrice(priceFrom);
 
 const variationText = ({ variationType, variationsCount }: ProductSummary) =>
   variationType === "none" ? "—" : `${variationsCount} ${variationType}${variationsCount === 1 ? "" : "s"}`;
@@ -75,7 +78,7 @@ export function ProductsView() {
               setSearchText(event.target.value);
               setPage(1);
             }}
-            placeholder="Search by name, brand or barcode"
+            placeholder="Search by name, brand, barcode or SKU"
             className={`${fieldClasses} pl-9 pr-3`}
           />
         </label>
@@ -151,6 +154,9 @@ export function ProductsView() {
                       <p className="break-words text-xs text-gray-500">
                         {[product.brand?.name, product.category?.path.join(" › ")].filter(Boolean).join(" · ") || "No brand or category yet"}
                       </p>
+                      <p className="text-xs text-gray-700">
+                        {priceText(product)} · {product.onHand} in stock
+                      </p>
                     </div>
                   </Link>
                 </li>
@@ -163,7 +169,9 @@ export function ProductsView() {
                   <tr>
                     <th className="px-4 py-3 font-medium">Product</th>
                     <th className="px-4 py-3 font-medium">Category</th>
-                    <th className="px-4 py-3 font-medium">Variations</th>
+                    <th className="hidden px-4 py-3 font-medium xl:table-cell">Variations</th>
+                    <th className="px-4 py-3 font-medium">Price</th>
+                    <th className="px-4 py-3 font-medium">Stock</th>
                     <th className="px-4 py-3 font-medium">Status</th>
                     <th className="hidden px-4 py-3 font-medium lg:table-cell">Added</th>
                   </tr>
@@ -181,7 +189,9 @@ export function ProductsView() {
                         </Link>
                       </td>
                       <td className="max-w-56 truncate px-4 py-3 text-gray-600">{product.category?.path.join(" › ") ?? "—"}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-gray-600">{variationText(product)}</td>
+                      <td className="hidden whitespace-nowrap px-4 py-3 text-gray-600 xl:table-cell">{variationText(product)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-gray-900">{priceText(product)}</td>
+                      <td className={`px-4 py-3 ${product.onHand === 0 ? "text-red-700" : "text-gray-900"}`}>{product.onHand}</td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <ProductStatusBadge status={product.status} />
                         {product.status === "draft" && product.missingToGoLive.length > 0 && (
