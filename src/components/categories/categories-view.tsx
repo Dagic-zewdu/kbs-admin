@@ -51,7 +51,12 @@ export function CategoriesView() {
         />
       </section>
 
-      {notice && <Alert type="success">{notice}</Alert>}
+      {/* Stays in sight while working down the list */}
+      {notice && (
+        <div className="sticky top-20 z-10">
+          <Alert type="success">{notice}</Alert>
+        </div>
+      )}
 
       <select
         aria-label="Filter by who created it"
