@@ -7,6 +7,7 @@ import {
   Percent,
   Settings,
   ShoppingBag,
+  Tag,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -34,6 +35,7 @@ export const navSections: NavSection[] = [
     items: [
       { label: "Products", href: "/products", icon: Package, comingSoon: true },
       { label: "Categories", href: "/categories", icon: FolderTree },
+      { label: "Brands", href: "/brands", icon: Tag },
       { label: "Inventory", href: "/inventory", icon: Boxes, comingSoon: true },
     ],
   },
