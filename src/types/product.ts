@@ -36,6 +36,9 @@ export interface ProductVariation {
   shadeHex: string | null;
   barcode: string | null;
   sku: string;
+  /** Private to the company */
+  costPrice: number | null;
+  /** Selling price, before VAT */
   price: number | null;
   compareAtPrice: number | null;
   lowStockLevel: number;

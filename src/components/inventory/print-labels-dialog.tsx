@@ -15,6 +15,7 @@ interface PrintLabelsDialogProps {
   product: string;
   variation: string;
   barcode: string;
+  /** What the customer pays, VAT included */
   price: number | null;
   /** Suggested number of labels */
   suggested: number;

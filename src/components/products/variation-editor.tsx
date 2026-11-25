@@ -5,8 +5,10 @@ import Link from "next/link";
 import { BarcodeField } from "@/components/barcode/barcode-field";
 import { BatchFields, emptyBatch, Field, type BatchForm } from "@/components/inventory/batch-fields";
 import { Button } from "@/components/ui/button";
+import { PriceSummary } from "./price-summary";
 import { formatDay } from "@/lib/labels";
-import { decimalText, wholeText } from "@/lib/numbers";
+import { decimalText, toNumber, wholeText } from "@/lib/numbers";
+import { useGetSettingsQuery } from "@/store/api/settings.api";
 import type { VariationStock } from "@/types/inventory";
 import type { SizeUnit, VariationType } from "@/types/product";
 
@@ -20,6 +22,7 @@ export interface VariationRow {
   shadeHex: string;
   barcode: string;
   sku: string;
+  costPrice: string;
   price: string;
   compareAtPrice: string;
   lowStockLevel: string;
@@ -38,6 +41,7 @@ export const emptyVariation = (): VariationRow => ({
   shadeHex: "",
   barcode: "",
   sku: "",
+  costPrice: "",
   price: "",
   compareAtPrice: "",
   lowStockLevel: "5",
@@ -164,6 +168,7 @@ interface VariationFieldsProps {
 
 function VariationFields({ type, row, onChange, productId, expiryRequired }: VariationFieldsProps) {
   const nameField = nameLabels[type];
+  const settings = useGetSettingsQuery().data?.data;
   return (
     <>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -217,8 +222,17 @@ function VariationFields({ type, row, onChange, productId, expiryRequired }: Var
 
       <BarcodeField value={row.barcode} onChange={(barcode) => onChange({ barcode })} productId={productId} />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Field label="Price, ETB">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <Field label="Cost price, ETB">
+          <input
+            inputMode="decimal"
+            value={row.costPrice}
+            onChange={(event) => onChange({ costPrice: decimalText(event.target.value) })}
+            placeholder="1000"
+            className={fullWidth}
+          />
+        </Field>
+        <Field label={settings?.vatEnabled ? "Selling price, before VAT" : "Selling price, ETB"}>
           <input
             inputMode="decimal"
             value={row.price}
@@ -227,7 +241,7 @@ function VariationFields({ type, row, onChange, productId, expiryRequired }: Var
             className={fullWidth}
           />
         </Field>
-        <Field label="Old price (optional)">
+        <Field label="Old selling price (optional)">
           <input
             inputMode="decimal"
             value={row.compareAtPrice}
@@ -236,6 +250,9 @@ function VariationFields({ type, row, onChange, productId, expiryRequired }: Var
             className={fullWidth}
           />
         </Field>
+      </div>
+      <PriceSummary price={toNumber(row.price)} cost={toNumber(row.costPrice)} settings={settings} />
+      <div className="grid grid-cols-2 gap-3">
         <Field label="SKU">
           <input
             value={row.sku}

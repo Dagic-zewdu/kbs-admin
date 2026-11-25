@@ -10,6 +10,8 @@ import { IconButton } from "@/components/ui/icon-button";
 import { PageHeader } from "@/components/ui/page-header";
 import { getErrorMessage } from "@/lib/api-error";
 import { formatDay, formatPrice } from "@/lib/labels";
+import { customerPrice } from "@/lib/pricing";
+import { useGetSettingsQuery } from "@/store/api/settings.api";
 import { useGetVariationStockQuery } from "@/store/api/inventory.api";
 import type { Batch, StockMovement } from "@/types/inventory";
 import { PrintLabelsDialog } from "./print-labels-dialog";
@@ -28,6 +30,7 @@ type OpenDialog = { type: "receive" | "labels" } | { type: "edit" | "adjust"; ba
 /** One variation: its batches and what happened to its stock */
 export function VariationStockView({ id }: { id: string }) {
   const { data, isLoading, error } = useGetVariationStockQuery(id);
+  const settings = useGetSettingsQuery().data?.data;
   const [dialog, setDialog] = useState<OpenDialog>(null);
   const [notice, setNotice] = useState("");
 
@@ -67,7 +70,7 @@ export function VariationStockView({ id }: { id: string }) {
           { label: "In stock", value: String(stock.onHand), alert: stock.onHand === 0 },
           { label: "Next expiry", value: formatDay(stock.nextExpiry) },
           { label: "Expired", value: String(stock.expired), alert: stock.expired > 0 },
-          { label: "Price", value: formatPrice(variation.price) },
+          { label: "Selling price", value: formatPrice(variation.price) },
         ].map((item) => (
           <div key={item.label} className="rounded-xl border border-gray-200 bg-white p-4">
             <dt className="text-xs text-gray-500">{item.label}</dt>
@@ -149,7 +152,7 @@ export function VariationStockView({ id }: { id: string }) {
           product={product.name}
           variation={variation.name}
           barcode={variation.barcode}
-          price={variation.price}
+          price={settings ? customerPrice(variation.price, settings) : null}
           suggested={stock.onHand}
           onClose={close}
         />

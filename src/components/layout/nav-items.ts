@@ -53,7 +53,7 @@ export const navSections: NavSection[] = [
   },
   {
     title: "System",
-    items: [{ label: "Settings", href: "/settings", icon: Settings, comingSoon: true }],
+    items: [{ label: "Settings", href: "/settings", icon: Settings }],
   },
 ];
 

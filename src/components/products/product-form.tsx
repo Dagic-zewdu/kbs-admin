@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage } from "@/lib/api-error";
 import { formatPrice } from "@/lib/labels";
 import { toNumber } from "@/lib/numbers";
+import { profitOf } from "@/lib/pricing";
 import {
   useChangeProductStatusMutation,
   useCreateProductMutation,
@@ -59,6 +60,7 @@ const toForm = (product?: Product) => ({
     shadeHex: variation.shadeHex ?? "",
     barcode: variation.barcode ?? "",
     sku: variation.sku,
+    costPrice: variation.costPrice === null ? "" : String(variation.costPrice),
     price: variation.price === null ? "" : String(variation.price),
     compareAtPrice: variation.compareAtPrice === null ? "" : String(variation.compareAtPrice),
     lowStockLevel: String(variation.lowStockLevel),
@@ -106,6 +108,16 @@ const missingNow = (form: FormState) => {
   if (!form.description.trim()) missing.push("description");
   return missing;
 };
+
+function ReviewProfit({ price, cost }: { price: number | null; cost: number | null }) {
+  if (!price || cost === null) return null;
+  const { amount } = profitOf(price, cost);
+  return (
+    <span className={clsx("block", amount < 0 ? "text-red-700" : "text-emerald-700")}>
+      {amount < 0 ? "Loss" : "Profit"} {formatPrice(Math.abs(amount))}
+    </span>
+  );
+}
 
 /** Hidden steps stay mounted, so nothing typed is lost */
 function Section({ title, description, shown, children }: { title: string; description: string; shown: boolean; children: React.ReactNode }) {
@@ -168,9 +180,10 @@ export function ProductForm({ product }: { product?: Product }) {
     if (form.name.trim().length < 2) return { step: "basics", message: "Enter the product name." };
     for (const row of form.variations) {
       if (row.sizeValue && !(Number(row.sizeValue) > 0)) return { step: "variations", message: `“${row.sizeValue}” is not a valid size.` };
-      if (row.price && !(Number(row.price) > 0)) return { step: "variations", message: "A price must be more than 0." };
+      if (row.price && !(Number(row.price) > 0)) return { step: "variations", message: "A selling price must be more than 0." };
+      if (row.costPrice && !Number.isFinite(Number(row.costPrice))) return { step: "variations", message: `“${row.costPrice}” is not a valid cost price.` };
       if (row.compareAtPrice && !(Number(row.compareAtPrice) > Number(row.price))) {
-        return { step: "variations", message: "The old price must be higher than the price." };
+        return { step: "variations", message: "The old selling price must be higher than the selling price." };
       }
       const { quantity, ...details } = row.newBatch;
       if (!row.stock?.batches && !Number(quantity) && Object.values(details).some(Boolean)) {
@@ -219,6 +232,7 @@ export function ProductForm({ product }: { product?: Product }) {
         shadeHex: row.shadeHex || null,
         barcode: row.barcode.trim() || null,
         sku: row.sku.trim() || null,
+        costPrice: toNumber(row.costPrice),
         price: toNumber(row.price),
         compareAtPrice: toNumber(row.compareAtPrice),
         lowStockLevel: Number(row.lowStockLevel || 0),
@@ -240,6 +254,13 @@ export function ProductForm({ product }: { product?: Product }) {
     if (!product) return router.replace(`/products/${id}?${live?.data ? "live" : "created"}=1`);
     if (thenLive && !live?.data) return;
     setNotice(thenLive ? "Saved. It's live in the shop." : "Saved.");
+  };
+
+  // The brand fills in its country, unless staff typed another one
+  const chooseBrand = (brand: Brand | null) => {
+    const typed = form.countryOfOrigin.trim();
+    const isFromBrand = !typed || typed === form.brand?.country;
+    change({ brand, countryOfOrigin: isFromBrand ? (brand?.country ?? "") : form.countryOfOrigin });
   };
 
   // The category suggests the routine step, unless staff chose one
@@ -302,11 +323,11 @@ export function ProductForm({ product }: { product?: Product }) {
           )}
           <Input label="Product name" placeholder="Low pH Good Morning Gel Cleanser" maxLength={200} {...field("name")} />
           <div className="grid gap-4 md:grid-cols-2">
-            <BrandSelect label="Brand" value={form.brand} onChange={(brand) => change({ brand })} />
+            <BrandSelect label="Brand" value={form.brand} onChange={chooseBrand} />
             <CategorySelect label="Category" value={form.category} onChange={chooseCategory} />
           </div>
           <div className="grid gap-4 md:grid-cols-2">
-            <Input label="Country of origin (optional)" placeholder="South Korea" maxLength={100} {...field("countryOfOrigin")} />
+            <Input label="Country of origin (filled in from the brand)" placeholder="South Korea" maxLength={100} {...field("countryOfOrigin")} />
             <Input label="EFDA number (optional)" maxLength={100} {...field("efdaNumber")} />
           </div>
           {form.category && (
@@ -391,6 +412,7 @@ export function ProductForm({ product }: { product?: Product }) {
                 </span>
                 <span className="text-right text-gray-900">
                   {formatPrice(toNumber(row.price))}
+                  <ReviewProfit price={toNumber(row.price)} cost={toNumber(row.costPrice)} />
                   <span className="block text-gray-500">{row.stock?.batches ? row.stock.onHand : Number(row.newBatch.quantity || 0)} in stock</span>
                 </span>
               </li>
