@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { PriceSummary } from "@/components/products/price-summary";
+import { ScanInput } from "@/components/barcode/scan-input";
+import { normalizeBarcode } from "@/lib/barcode";
 import { getErrorMessage } from "@/lib/api-error";
 import { formatPrice } from "@/lib/labels";
 import { decimalText, toNumber, wholeText } from "@/lib/numbers";
-import { useAdjustBatchMutation, useReceiveBatchMutation, useReduceStockMutation, useUpdateBatchMutation } from "@/store/api/inventory.api";
+import { useAdjustBatchMutation, useGetVariationStockQuery, useReceiveBatchMutation, useScanCodeQuery, useReduceStockMutation, useUpdateBatchMutation } from "@/store/api/inventory.api";
 import { useGetSettingsQuery } from "@/store/api/settings.api";
 import type { AdjustBatch, Batch, ReduceReason, VariationStockDetail } from "@/types/inventory";
 import { BatchFields, emptyBatch, Field, inputClasses, toBatchDetails, toReceiveBatch, type BatchForm } from "./batch-fields";
@@ -34,6 +36,16 @@ interface IncreaseDialogProps extends DoneProps {
 /** A delivery: how many, when they expire, and their prices */
 export function IncreaseDialog({ variationId, expiryRequired, now, onHand, onClose, onDone }: IncreaseDialogProps) {
   const [form, setForm] = useState<BatchForm>(emptyBatch);
+  const [barcode, setBarcode] = useState("");
+  const [isSameProduct, setIsSameProduct] = useState(false);
+  const detail = useGetVariationStockQuery(variationId).data?.data;
+  const known = detail?.variation.barcodes;
+  const code = normalizeBarcode(barcode);
+  const isKnown = Boolean(known?.some((item) => item.barcode === code));
+  // A first barcode needs no question: there is nothing to compare it with
+  const isNew = Boolean(code.length >= 2 && known?.length && !isKnown);
+  const owner = useScanCodeQuery(code, { skip: !isNew || code.length < 4 });
+  const other = isNew && !owner.isFetching && owner.data?.data.matchedBy === "barcode" ? owner.data.data : undefined;
   const [costText, setCostText] = useState(now.cost);
   const [priceText, setPriceText] = useState(now.price);
   const [localError, setLocalError] = useState("");
@@ -45,12 +57,15 @@ export function IncreaseDialog({ variationId, expiryRequired, now, onHand, onClo
   const losesDiscount = price !== null && toNumber(now.oldPrice) !== null && price >= Number(now.oldPrice);
 
   const submit = async () => {
+    if (!code) return setLocalError("Scan or type the barcode on the units that arrived.");
+    if (other) return setLocalError(`This barcode belongs to ${other.product.name}.`);
+    if (isNew && !isSameProduct) return setLocalError("Confirm that the new barcode is the same product.");
     if (!(Number(form.quantity) > 0)) return setLocalError("Enter how many units to add.");
     if (expiryRequired && !form.expiryDate) return setLocalError("Enter the expiry date from the package.");
     if (cost === null || !Number.isFinite(cost)) return setLocalError("Enter the cost price of one unit.");
     if (price === null || !(price > 0)) return setLocalError("Enter the selling price of one unit.");
     setLocalError("");
-    const result = await receive({ variationId, ...toReceiveBatch(form), unitCost: cost, unitPrice: price });
+    const result = await receive({ variationId, ...toReceiveBatch(form), barcode: code, addBarcode: isNew || undefined, unitCost: cost, unitPrice: price });
     if (result.data) onDone(`${form.quantity} units were added.`, result.data.data);
   };
   const typing = (apply: () => void) => {
@@ -60,6 +75,52 @@ export function IncreaseDialog({ variationId, expiryRequired, now, onHand, onClo
 
   return (
     <FormDialog title="Increase quantity" submitLabel="Increase" isLoading={isLoading} error={localError || getErrorMessage(error)} onSubmit={submit} onClose={onClose}>
+      <div className="space-y-2">
+        <ScanInput
+          label="Barcode on the units that arrived"
+          isRequired
+          value={barcode}
+          onChange={(value) =>
+            typing(() => {
+              setBarcode(value);
+              setIsSameProduct(false);
+            })
+          }
+        />
+        {Boolean(known?.length) && !code && (
+          <div className="flex flex-wrap gap-2">
+            {known?.map((item) => (
+              <button
+                key={item.barcode}
+                type="button"
+                onClick={() => typing(() => setBarcode(item.barcode))}
+                className="min-h-9 rounded-full border border-gray-300 bg-white px-3 text-sm text-gray-700 hover:border-brand-300 hover:bg-brand-50"
+              >
+                {item.barcode}
+              </button>
+            ))}
+          </div>
+        )}
+        {isKnown && <p className="text-sm text-emerald-700">This product.</p>}
+        {other && (
+          <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-2.5 text-sm text-red-800">
+            This barcode belongs to <strong className="font-semibold">{other.product.name}</strong> ({other.variation.sku}).
+          </p>
+        )}
+        {isNew && !other && (
+          <label className="flex cursor-pointer gap-2.5 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-sm text-amber-900">
+            <input
+              type="checkbox"
+              checked={isSameProduct}
+              onChange={(event) => typing(() => setIsSameProduct(event.target.checked))}
+              className="mt-0.5 size-4 shrink-0 accent-brand-600"
+            />
+            <span>
+              This barcode is new. <strong className="font-semibold">It&apos;s the same product, size and shade</strong>, only the barcode is different. Add it.
+            </span>
+          </label>
+        )}
+      </div>
       <BatchFields value={form} onChange={(change) => typing(() => setForm({ ...form, ...change }))} expiryRequired={expiryRequired}>
         <Field label="Cost price of one unit, ETB" isRequired>
           <input

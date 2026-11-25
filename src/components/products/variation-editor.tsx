@@ -3,6 +3,7 @@
 import { Boxes, Minus, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { VariationBarcodes } from "@/components/barcode/variation-barcodes";
 import { BarcodeField } from "@/components/barcode/barcode-field";
 import { BatchFields, emptyBatch, Field, type BatchForm } from "@/components/inventory/batch-fields";
 import { RequiredMark } from "@/components/ui/required-mark";
@@ -12,7 +13,7 @@ import { PriceSummary } from "./price-summary";
 import { formatDay } from "@/lib/labels";
 import { decimalText, toNumber, wholeText } from "@/lib/numbers";
 import { useGetSettingsQuery } from "@/store/api/settings.api";
-import type { VariationStock, VariationStockDetail } from "@/types/inventory";
+import type { VariationBarcode, VariationStock, VariationStockDetail } from "@/types/inventory";
 import type { SizeUnit, VariationType } from "@/types/product";
 
 /** A row while editing: text fields stay text until saving */
@@ -24,6 +25,8 @@ export interface VariationRow {
   sizeUnit: SizeUnit;
   shadeHex: string;
   barcode: string;
+  /** Saved ones, the main one included */
+  barcodes?: VariationBarcode[];
   sku: string;
   costPrice: string;
   price: string;
@@ -231,6 +234,7 @@ function VariationFields({ type, row, onChange, onStockChange, productId, expiry
       </div>
 
       <BarcodeField isRequired value={row.barcode} onChange={(barcode) => onChange({ barcode })} productId={productId} />
+      {row.id && Boolean(row.barcodes?.length) && <VariationBarcodes variationId={row.id} barcodes={row.barcodes!} onChanged={onStockChange} />}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <Field label="Cost price, ETB" isRequired>

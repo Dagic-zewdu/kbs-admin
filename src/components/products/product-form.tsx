@@ -62,6 +62,7 @@ const toForm = (product?: Product) => ({
     sizeUnit: variation.sizeUnit ?? "ml",
     shadeHex: variation.shadeHex ?? "",
     barcode: variation.barcode ?? "",
+    barcodes: variation.barcodes,
     sku: variation.sku,
     costPrice: variation.costPrice === null ? "" : String(variation.costPrice),
     price: variation.price === null ? "" : String(variation.price),
@@ -156,9 +157,12 @@ function Section({
 }
 
 /** Create or edit a product, step by step. Saved as a draft at any step; only the name is required. */
-export function ProductForm({ product }: { product?: Product }) {
+export function ProductForm({ product, barcode = "" }: { product?: Product; barcode?: string }) {
   const router = useRouter();
-  const [form, setForm] = useState<FormState>(() => toForm(product));
+  const [form, setForm] = useState<FormState>(() => {
+    const start = toForm(product);
+    return product || !barcode ? start : { ...start, variations: [{ ...start.variations[0], barcode }] };
+  });
   const [isDirty, setIsDirty] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [notice, setNotice] = useState("");
@@ -294,16 +298,19 @@ export function ProductForm({ product }: { product?: Product }) {
     setNotice(then === "live" ? "Saved. It's live on the website." : then === "private" ? "Saved. Staff can sell it." : "Saved.");
   };
 
-  // Already saved, so nothing becomes unsaved. A delivery also sets the prices; a decrease keeps what is typed.
+  // Stock and barcodes. Already saved, so nothing becomes unsaved. A delivery also sets the prices; a decrease keeps what is typed.
   const applyStock = (id: string, { stock, variation }: VariationStockDetail) =>
     setForm((current) => ({
       ...current,
       variations: current.variations.map((row) => {
         if (row.id !== id) return row;
-        if (stock.batches === row.stock?.batches) return { ...row, stock };
+        // The main barcode follows, unless another one is being typed
+        const savedMain = row.barcodes?.find((item) => item.isMain)?.barcode ?? "";
+        const barcode = row.barcode.trim() === savedMain ? (variation.barcode ?? "") : row.barcode;
+        const saved = { ...row, stock, barcode, barcodes: variation.barcodes };
+        if (stock.batches === row.stock?.batches) return saved;
         return {
-          ...row,
-          stock,
+          ...saved,
           costPrice: String(variation.costPrice ?? ""),
           price: String(variation.price ?? ""),
           // An old price that isn't higher any more is removed, as on the server

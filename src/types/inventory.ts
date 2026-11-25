@@ -8,6 +8,29 @@ export interface VariationStock {
   nextExpiry: string | null;
 }
 
+export interface VariationBarcode {
+  barcode: string;
+  /** Printed on stickers */
+  isMain: boolean;
+  /** A delivery came with it, so it stays */
+  isUsed: boolean;
+}
+
+/** What a scanned code is */
+export interface ScannedItem {
+  code: string;
+  matchedBy: "barcode" | "sku";
+  variation: { id: string; name: string; sku: string; barcode: string | null };
+  product: { id: string; name: string; brand: string | null; status: ProductStatus; photoUrl: string | null };
+  /** Before VAT */
+  price: number | null;
+  customerPrice: number | null;
+  onHand: number;
+  nextExpiry: string | null;
+  canBeSold: boolean;
+  problem: "STATUS" | "NO_PRICE" | "OUT_OF_STOCK" | null;
+}
+
 export type InventoryFilter = "all" | "low" | "out" | "expiring" | "expired";
 
 export interface InventoryItem {
@@ -23,6 +46,8 @@ export interface InventoryItem {
 
 export interface Batch {
   id: string;
+  /** It came with this one */
+  barcode: string | null;
   batchNumber: string | null;
   manufacturingDate: string | null;
   expiryDate: string | null;
@@ -51,7 +76,7 @@ export interface StockMovement {
 }
 
 export interface VariationStockDetail {
-  variation: Omit<InventoryItem, "product" | "stock"> & { costPrice: number | null; compareAtPrice: number | null };
+  variation: Omit<InventoryItem, "product" | "stock"> & { barcodes: VariationBarcode[]; costPrice: number | null; compareAtPrice: number | null };
   product: InventoryItem["product"];
   expiryRequired: boolean;
   stock: VariationStock;
@@ -69,6 +94,7 @@ export interface BatchDetails {
 }
 
 export type ReceiveBatch = BatchDetails & { quantity: number };
+export type ReceiveStock = ReceiveBatch & { barcode: string; addBarcode?: boolean };
 
 /** Why units are taken out of stock */
 export type ReduceReason = "damaged" | "lost" | "expired" | "tester" | "gift" | "supplier_return" | "wrong_count" | "other";

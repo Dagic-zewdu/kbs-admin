@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { ArrowDownUp, Loader2, Pencil, Minus, Plus, Printer } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { VariationBarcodes } from "@/components/barcode/variation-barcodes";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
@@ -82,11 +83,16 @@ export function VariationStockView({ id }: { id: string }) {
         ))}
       </dl>
       <p className="break-words text-sm text-gray-600">
-        SKU {variation.sku} · Barcode {variation.barcode ?? "—"} ·{" "}
+        SKU {variation.sku} ·{" "}
         <Link href={`/products/${product.id}`} className="font-medium text-brand-700 hover:underline">
           Open product
         </Link>
       </p>
+
+      <section className="space-y-3 rounded-xl border border-gray-200 bg-white p-4">
+        <h2 className="text-base font-semibold text-gray-900">Barcodes</h2>
+        <VariationBarcodes variationId={id} barcodes={variation.barcodes} />
+      </section>
 
       <section className="overflow-hidden rounded-xl border border-gray-200 bg-white">
         <h2 className="px-4 pt-4 text-base font-semibold text-gray-900">Batches</h2>
@@ -101,6 +107,7 @@ export function VariationStockView({ id }: { id: string }) {
                 </p>
                 <p className="break-words text-xs text-gray-500">
                   {[
+                    batch.barcode,
                     batch.batchNumber && `Batch ${batch.batchNumber}`,
                     `received ${formatDay(batch.receivedDate)}`,
                     batch.unitCost !== null && `cost ${formatPrice(batch.unitCost)}`,

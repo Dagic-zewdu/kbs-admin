@@ -4,6 +4,7 @@ import { ImageIcon, Loader2, Package, Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { QuickScan } from "@/components/barcode/quick-scan";
 import { Alert } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/pagination";
@@ -53,6 +54,7 @@ function Codes({ product }: { product: ProductSummary }) {
           <span className="text-gray-500 md:block">
             <span className="md:hidden"> · </span>
             {code.barcode ?? "no barcode"}
+            {code.otherBarcodes.length > 0 && <span title={code.otherBarcodes.join(", ")}> +{code.otherBarcodes.length}</span>}
           </span>
         </span>
       ))}
@@ -91,7 +93,12 @@ export function ProductsView() {
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      <PageHeader title="Products" description="Your company's products. Other companies can't see them." actions={createButton} />
+      <PageHeader title="Products" description="Your company's products. Other companies can't see them." actions={
+          <>
+            <QuickScan />
+            {createButton}
+          </>
+        } />
       {notice && <Alert type="success">{notice}</Alert>}
 
       <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-[1fr_9rem_14rem_9rem]">

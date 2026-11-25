@@ -1,6 +1,6 @@
 import type { AdvisorCompleteness, AdvisorProfile, IngredientAnalysis, ProductIngredient } from "./advisor";
 import type { Brand } from "./brand";
-import type { ReceiveBatch, VariationStock } from "./inventory";
+import type { ReceiveBatch, VariationBarcode, VariationStock } from "./inventory";
 import type { Category } from "./category";
 
 export type ProductStatus = "draft" | "private" | "live" | "inactive";
@@ -23,7 +23,7 @@ export interface ProductSummary {
   /** Units that can be sold */
   onHand: number;
   /** Of each variation, in order */
-  codes: { id: string; name: string; sku: string; barcode: string | null }[];
+  codes: { id: string; name: string; sku: string; barcode: string | null; otherBarcodes: string[] }[];
   /** What is still needed before staff can sell it (private) */
   missingToSell: string[];
   /** What is still needed before it can go live */
@@ -39,6 +39,7 @@ export interface ProductVariation {
   sizeUnit: SizeUnit | null;
   shadeHex: string | null;
   barcode: string | null;
+  barcodes: VariationBarcode[];
   sku: string;
   /** Private to the company */
   costPrice: number | null;
@@ -100,7 +101,7 @@ export interface SaveProductRequest {
   advisor: AdvisorProfile;
   attributes: Record<string, AttributeValue>;
   variationType: VariationType;
-  variations: (Omit<ProductVariation, "id" | "stock" | "sku"> & { id?: string; sku: string | null; newBatch?: ReceiveBatch })[];
+  variations: (Omit<ProductVariation, "id" | "stock" | "sku" | "barcodes"> & { id?: string; sku: string | null; newBatch?: ReceiveBatch })[];
   photoFileIds: string[];
 }
 
