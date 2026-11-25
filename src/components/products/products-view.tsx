@@ -38,7 +38,7 @@ const priceText = ({ priceFrom, priceTo }: ProductSummary) =>
   priceFrom !== null && priceTo !== null && priceFrom !== priceTo ? `${formatPrice(priceFrom)} – ${formatPrice(priceTo)}` : formatPrice(priceFrom);
 
 const variationText = ({ variationType, variationsCount }: ProductSummary) =>
-  variationType === "none" ? "—" : `${variationsCount} ${variationType}${variationsCount === 1 ? "" : "s"}`;
+  variationType === "none" ? null : `${variationsCount} ${variationType}${variationsCount === 1 ? "" : "s"}`;
 
 const SHOWN_CODES = 2;
 
@@ -50,7 +50,10 @@ function Codes({ product }: { product: ProductSummary }) {
       {product.codes.slice(0, SHOWN_CODES).map((code) => (
         <span key={code.id} className="block whitespace-nowrap">
           <strong className="font-semibold text-gray-900">{code.sku}</strong>
-          <span className="text-gray-500"> · {code.barcode ?? "no barcode"}</span>
+          <span className="text-gray-500 md:block">
+            <span className="md:hidden"> · </span>
+            {code.barcode ?? "no barcode"}
+          </span>
         </span>
       ))}
       {more > 0 && <span className="block text-gray-500">+{more} more</span>}
@@ -195,42 +198,40 @@ export function ProductsView() {
                   <tr>
                     <th className="px-4 py-3 font-medium">Product</th>
                     <th className="px-4 py-3 font-medium">SKU · Barcode</th>
-                    <th className="hidden px-4 py-3 font-medium lg:table-cell">Category</th>
-                    <th className="hidden px-4 py-3 font-medium xl:table-cell">Variations</th>
+                    <th className="hidden px-4 py-3 font-medium xl:table-cell">Category</th>
                     <th className="px-4 py-3 font-medium">Price</th>
                     <th className="px-4 py-3 font-medium">Stock</th>
                     <th className="px-4 py-3 font-medium">Status</th>
                     <th className="hidden px-4 py-3 font-medium 2xl:table-cell">Added</th>
-                    <th className="px-4 py-3 text-right font-medium">Actions</th>
+                    <th className="sticky right-0 bg-gray-50 px-4 py-3 text-right font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {result.items.map((product) => (
                     <tr key={product.id} className="hover:bg-brand-50/30">
-                      <td className="max-w-80 px-4 py-3">
+                      <td className="max-w-64 px-4 py-3">
                         <Link href={`/products/${product.id}`} className="flex items-center gap-3">
                           <MainPhoto product={product} className="size-12" />
                           <span className="min-w-0">
                             <span className="block truncate font-medium text-gray-900 hover:text-brand-700">{product.name}</span>
-                            <span className="block truncate text-xs text-gray-500">{product.brand?.name ?? "No brand"}</span>
+                            <span className="block truncate text-xs text-gray-500">{[product.brand?.name ?? "No brand", variationText(product)].filter(Boolean).join(" · ")}</span>
                           </span>
                         </Link>
                       </td>
                       <td className="px-4 py-3">
                         <Codes product={product} />
                       </td>
-                      <td className="hidden max-w-44 truncate lg:table-cell px-4 py-3 text-gray-600">{product.category?.path.join(" › ") ?? "—"}</td>
-                      <td className="hidden whitespace-nowrap px-4 py-3 text-gray-600 xl:table-cell">{variationText(product)}</td>
+                      <td className="hidden max-w-40 truncate xl:table-cell px-4 py-3 text-gray-600">{product.category?.path.join(" › ") ?? "—"}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-gray-900">{priceText(product)}</td>
                       <td className={`px-4 py-3 ${product.onHand === 0 ? "text-red-700" : "text-gray-900"}`}>{product.onHand}</td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <ProductStatusBadge status={product.status} />
                         {product.status === "draft" && product.missingToGoLive.length > 0 && (
-                          <span className="ml-2 text-xs text-gray-500">{product.missingToGoLive.length} missing</span>
+                          <span className="mt-1 block text-xs text-gray-500">{product.missingToGoLive.length} missing</span>
                         )}
                       </td>
                       <td className="hidden whitespace-nowrap px-4 py-3 text-gray-600 2xl:table-cell">{formatDate(product.createdAt)}</td>
-                      <td className="px-4 py-2">
+                      <td className="sticky right-0 bg-white px-2 py-2">
                         <span className="flex justify-end">{actions(product)}</span>
                       </td>
                     </tr>
