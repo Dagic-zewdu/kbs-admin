@@ -41,7 +41,7 @@ const nameLabels: Partial<Record<VariationType, { label: string; placeholder: st
 
 const units: SizeUnit[] = ["ml", "g", "oz", "pcs", "sheets"];
 const inputClasses =
-  "h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 sm:h-10";
+  "h-11 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 sm:h-10";
 
 interface VariationEditorProps {
   type: VariationType;
@@ -114,7 +114,7 @@ export function VariationEditor({ type, rows, onChange }: VariationEditorProps) 
                       onChange={(event) => changeRow(row.key, { name: event.target.value })}
                       placeholder={nameField.placeholder}
                       maxLength={80}
-                      className={inputClasses}
+                      className={`${inputClasses} w-full min-w-0`}
                     />
                     {type === "shade" && (
                       <input
@@ -138,7 +138,7 @@ export function VariationEditor({ type, rows, onChange }: VariationEditorProps) 
                     value={row.sizeValue}
                     onChange={(event) => changeRow(row.key, { sizeValue: event.target.value.replace(",", ".").replace(/[^\d.]/g, "") })}
                     placeholder="150"
-                    className={inputClasses}
+                    className={`${inputClasses} w-full min-w-0`}
                   />
                   <select
                     aria-label="Unit"
@@ -162,7 +162,7 @@ export function VariationEditor({ type, rows, onChange }: VariationEditorProps) 
                   }}
                   placeholder="8809416470009"
                   maxLength={40}
-                  className={inputClasses}
+                  className={`${inputClasses} w-full min-w-0`}
                 />
               </label>
             </div>
