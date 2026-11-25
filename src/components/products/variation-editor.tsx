@@ -314,11 +314,11 @@ function Quantity({ row, onChange, onStockChange, expiryRequired }: Pick<Variati
               </p>
             </div>
             <div className="flex w-full items-center justify-between gap-2 sm:w-auto">
-              <Button type="button" variant="secondary" className="px-3" onClick={() => setDialog("decrease")} disabled={stock.onHand === 0}>
+              <Button type="button" variant="secondary" className="px-2.5! sm:px-4!" onClick={() => setDialog("decrease")} disabled={stock.onHand === 0}>
                 <Minus className="size-4" aria-hidden /> Decrease
               </Button>
               <output className={`min-w-8 text-center text-lg font-semibold ${stock.onHand ? "text-gray-900" : "text-red-700"}`}>{stock.onHand}</output>
-              <Button type="button" variant="secondary" className="px-3" onClick={() => setDialog("increase")}>
+              <Button type="button" variant="secondary" className="px-2.5! sm:px-4!" onClick={() => setDialog("increase")}>
                 <Plus className="size-4" aria-hidden /> Increase
               </Button>
             </div>
