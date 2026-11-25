@@ -195,7 +195,12 @@ export function ProductForm({ product }: { product?: Product }) {
     return () => window.removeEventListener("beforeunload", warn);
   }, [isDirty]);
 
-  const changeAdvisor = (values: Partial<FormState["advisor"]>) => change({ advisor: { ...form.advisor, ...values } });
+  // From the newest form, so two quick changes don't undo each other
+  const changeAdvisor = (values: Partial<FormState["advisor"]>) => {
+    setForm((current) => ({ ...current, advisor: { ...current.advisor, ...values } }));
+    setIsDirty(true);
+    setNotice("");
+  };
   const expiryRequired = form.category?.expiryRequired ?? true;
 
   /** What is wrong before anything is sent, and the step to fix it */

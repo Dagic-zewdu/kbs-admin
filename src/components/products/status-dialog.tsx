@@ -45,6 +45,7 @@ export function StatusDialog({ product, onClose, onDone }: StatusDialogProps) {
                 type="radio"
                 name="status"
                 checked={status === item}
+                autoFocus={item === product.status}
                 disabled={isBlocked}
                 onChange={() => setStatus(item)}
                 className="mt-0.5 size-4 shrink-0 accent-brand-600"
