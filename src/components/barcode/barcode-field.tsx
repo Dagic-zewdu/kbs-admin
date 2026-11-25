@@ -28,7 +28,7 @@ export function BarcodeField({ value, onChange, productId, prominent, isRequired
   const [createCode, codeState] = useCreateInternalBarcodeMutation();
   const typed = value.trim();
   const lookup = useGetProductByBarcodeQuery(checked, { skip: checked.length < 2, refetchOnMountOrArgChange: true });
-  const owner = checked === typed && !lookup.isFetching && !lookup.isError ? lookup.data?.data.product : undefined;
+  const owner = checked === typed && !lookup.isError ? lookup.currentData?.data.product : undefined;
   const usedBy = owner && owner.id !== productId ? owner : undefined;
 
   const set = (barcode: string) => {

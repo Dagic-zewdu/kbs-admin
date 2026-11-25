@@ -45,7 +45,7 @@ export function IncreaseDialog({ variationId, expiryRequired, now, onHand, onClo
   // A first barcode needs no question: there is nothing to compare it with
   const isNew = Boolean(code.length >= 2 && known?.length && !isKnown);
   const owner = useScanCodeQuery(code, { skip: !isNew || code.length < 4 });
-  const other = isNew && !owner.isFetching && owner.data?.data.matchedBy === "barcode" ? owner.data.data : undefined;
+  const other = isNew && owner.currentData?.data.matchedBy === "barcode" ? owner.currentData.data : undefined;
   const [costText, setCostText] = useState(now.cost);
   const [priceText, setPriceText] = useState(now.price);
   const [localError, setLocalError] = useState("");
