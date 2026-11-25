@@ -100,7 +100,10 @@ export function ReduceDialog({ variationId, onHand, onClose, onDone }: DoneProps
       <p className="text-sm text-gray-600">{onHand} in stock. The units that expire first are taken away.</p>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="How many to take away" isRequired>
-          <input inputMode="numeric" value={quantity} onChange={(event) => setQuantity(wholeText(event.target.value).slice(0, 7))} className={inputClasses} />
+          <input inputMode="numeric" value={quantity} onChange={(event) => {
+              setQuantity(wholeText(event.target.value).slice(0, 7));
+              setLocalError("");
+            }} className={inputClasses} />
         </Field>
         <Field label="Why" isRequired>
           <select value={type} onChange={(event) => setType(event.target.value as ReduceStock["type"])} className={inputClasses}>
