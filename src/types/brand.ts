@@ -5,7 +5,15 @@ export interface Brand {
   slug: string;
   country: string | null;
   website: string | null;
+  description: string | null;
   logoUrl: string | null;
+}
+
+/** A brand in the list */
+export interface CompanyBrand extends Brand {
+  /** true when this company added it */
+  addedByUs: boolean;
+  createdAt: string;
 }
 
 export interface BrandSearchResult {
