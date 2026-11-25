@@ -12,7 +12,8 @@ const inputClasses =
   "h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 sm:h-10";
 
 interface PrintLabelsDialogProps {
-  title: string;
+  product: string;
+  variation: string;
   barcode: string;
   price: number | null;
   /** Suggested number of labels */
@@ -21,14 +22,14 @@ interface PrintLabelsDialogProps {
 }
 
 /** Barcode stickers of one variation. The browser prints them, or saves a PDF. */
-export function PrintLabelsDialog({ title, barcode, price, suggested, onClose }: PrintLabelsDialogProps) {
+export function PrintLabelsDialog({ product, variation, barcode, price, suggested, onClose }: PrintLabelsDialogProps) {
   const [paper, setPaper] = useState<Paper>(papers[0]);
   const [count, setCount] = useState(String(Math.min(Math.max(suggested, 1), MAX_LABELS)));
   const [startAt, setStartAt] = useState("1");
   const [withPrice, setWithPrice] = useState(false);
   const [error, setError] = useState("");
   const perPage = paper.columns * paper.rows;
-  const content = { title, barcode, price: withPrice ? price : null };
+  const content = { product, variation, barcode, price: withPrice ? price : null };
   const problem = labelProblem(barcode, paper);
   const total = Number(count);
   const skip = perPage > 1 ? Number(startAt) - 1 : 0;

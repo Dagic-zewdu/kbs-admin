@@ -145,7 +145,14 @@ export function VariationStockView({ id }: { id: string }) {
 
       {dialog?.type === "receive" && <ReceiveDialog variationId={id} expiryRequired={expiryRequired} onClose={close} onDone={done} />}
       {dialog?.type === "labels" && variation.barcode && (
-        <PrintLabelsDialog title={title} barcode={variation.barcode} price={variation.price} suggested={stock.onHand} onClose={close} />
+        <PrintLabelsDialog
+          product={product.name}
+          variation={variation.name}
+          barcode={variation.barcode}
+          price={variation.price}
+          suggested={stock.onHand}
+          onClose={close}
+        />
       )}
       {dialog?.type === "edit" && <EditBatchDialog batch={dialog.batch} expiryRequired={expiryRequired} onClose={close} onDone={done} />}
       {dialog?.type === "adjust" && <AdjustDialog batch={dialog.batch} onClose={close} onDone={done} />}

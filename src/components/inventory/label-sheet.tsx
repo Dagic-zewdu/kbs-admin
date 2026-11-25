@@ -2,7 +2,9 @@ import { encodeCode128, type Barcode } from "@/lib/code128";
 import { formatPrice } from "@/lib/labels";
 
 export interface LabelContent {
-  title: string;
+  product: string;
+  /** "" for a product with one version */
+  variation: string;
   barcode: string;
   /** null: not printed */
   price: number | null;
@@ -38,9 +40,11 @@ export function Label({ content, paper }: { content: LabelContent; paper: Paper 
       style={{ width: `${paper.width}mm`, height: `${paper.height}mm`, padding: `${PADDING_MM / 2}mm`, boxSizing: "border-box" }}
       className="flex flex-col items-center justify-center overflow-hidden bg-white text-center text-black"
     >
-      <p className="line-clamp-2 w-full px-[1mm] font-medium" style={{ fontSize: "2.8mm", lineHeight: 1.2, overflowWrap: "anywhere" }}>
-        {content.title}
-      </p>
+      <div className="w-full px-[1mm]" style={{ fontSize: "2.8mm", lineHeight: 1.2, overflowWrap: "anywhere" }}>
+        <p className={content.variation ? "line-clamp-1 font-medium" : "line-clamp-2 font-medium"}>{content.product}</p>
+        {/* Its own line, so a long product name never cuts off the size or shade */}
+        {content.variation && <p className="line-clamp-1 font-semibold">{content.variation}</p>}
+      </div>
       <svg
         role="img"
         aria-label={`Barcode ${content.barcode}`}
