@@ -228,6 +228,8 @@ export function ProductForm({ product }: { product?: Product }) {
     };
 
     const saved = product ? await update({ id: product.id, ...body }) : await create(body);
+    // The result is shown at the top
+    window.scrollTo({ top: 0 });
     if (!saved.data) return;
     const { id } = saved.data.data;
     // New variations now have ids, SKUs and stock: saving again must not add the stock twice
@@ -285,6 +287,9 @@ export function ProductForm({ product }: { product?: Product }) {
             ))}
           </ol>
         </nav>
+
+        {(localError || error) && <Alert>{localError || getErrorMessage(error)}</Alert>}
+        {notice && <Alert type="success">{notice}</Alert>}
 
         <Section shown={step === "basics"} title="Basics" description="Scan the barcode first. Only the name is needed to save a draft.">
           {form.variationType === "none" && (
@@ -418,9 +423,6 @@ export function ProductForm({ product }: { product?: Product }) {
             </Button>
           )}
         </Section>
-
-        {(localError || error) && <Alert>{localError || getErrorMessage(error)}</Alert>}
-        {notice && <Alert type="success">{notice}</Alert>}
 
         <div className="flex flex-col gap-2 rounded-xl border border-gray-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="grid grid-cols-2 gap-2 sm:flex">
