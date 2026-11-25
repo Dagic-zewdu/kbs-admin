@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { ArrowDownUp, Loader2, Pencil, Plus } from "lucide-react";
+import { ArrowDownUp, Loader2, Pencil, Plus, Printer } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { Alert } from "@/components/ui/alert";
@@ -12,6 +12,7 @@ import { getErrorMessage } from "@/lib/api-error";
 import { formatDay, formatPrice } from "@/lib/labels";
 import { useGetVariationStockQuery } from "@/store/api/inventory.api";
 import type { Batch, StockMovement } from "@/types/inventory";
+import { PrintLabelsDialog } from "./print-labels-dialog";
 import { AdjustDialog, EditBatchDialog, ReceiveDialog } from "./stock-dialogs";
 
 const movementLabels: Record<StockMovement["type"], string> = {
@@ -22,7 +23,7 @@ const movementLabels: Record<StockMovement["type"], string> = {
   corrected: "Counted again",
 };
 
-type OpenDialog = { type: "receive" } | { type: "edit" | "adjust"; batch: Batch } | null;
+type OpenDialog = { type: "receive" | "labels" } | { type: "edit" | "adjust"; batch: Batch } | null;
 
 /** One variation: its batches and what happened to its stock */
 export function VariationStockView({ id }: { id: string }) {
@@ -34,6 +35,7 @@ export function VariationStockView({ id }: { id: string }) {
   if (!data) return <p className="py-16 text-center text-sm text-red-600">{getErrorMessage(error) || "Not found"}</p>;
   const { variation, product, stock, batches, movements, expiryRequired } = data.data;
 
+  const title = variation.name ? `${product.name} · ${variation.name}` : product.name;
   const close = () => setDialog(null);
   const done = (message: string) => {
     setDialog(null);
@@ -43,12 +45,19 @@ export function VariationStockView({ id }: { id: string }) {
   return (
     <div className="space-y-5 sm:space-y-6">
       <PageHeader
-        title={variation.name ? `${product.name} · ${variation.name}` : product.name}
+        title={title}
         backHref="/inventory"
         actions={
-          <Button type="button" onClick={() => setDialog({ type: "receive" })}>
-            <Plus className="size-4" aria-hidden /> Receive stock
-          </Button>
+          <>
+            {variation.barcode && (
+              <Button type="button" variant="secondary" onClick={() => setDialog({ type: "labels" })}>
+                <Printer className="size-4" aria-hidden /> Print labels
+              </Button>
+            )}
+            <Button type="button" onClick={() => setDialog({ type: "receive" })}>
+              <Plus className="size-4" aria-hidden /> Receive stock
+            </Button>
+          </>
         }
       />
       {notice && <Alert type="success">{notice}</Alert>}
@@ -135,6 +144,9 @@ export function VariationStockView({ id }: { id: string }) {
       </section>
 
       {dialog?.type === "receive" && <ReceiveDialog variationId={id} expiryRequired={expiryRequired} onClose={close} onDone={done} />}
+      {dialog?.type === "labels" && variation.barcode && (
+        <PrintLabelsDialog title={title} barcode={variation.barcode} price={variation.price} suggested={stock.onHand} onClose={close} />
+      )}
       {dialog?.type === "edit" && <EditBatchDialog batch={dialog.batch} expiryRequired={expiryRequired} onClose={close} onDone={done} />}
       {dialog?.type === "adjust" && <AdjustDialog batch={dialog.batch} onClose={close} onDone={done} />}
     </div>
