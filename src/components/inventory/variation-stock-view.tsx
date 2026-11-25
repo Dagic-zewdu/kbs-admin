@@ -15,7 +15,7 @@ import { useGetSettingsQuery } from "@/store/api/settings.api";
 import { useGetVariationStockQuery } from "@/store/api/inventory.api";
 import type { Batch, StockMovement } from "@/types/inventory";
 import { PrintLabelsDialog } from "./print-labels-dialog";
-import { AdjustDialog, EditBatchDialog, ReceiveDialog, ReduceDialog } from "./stock-dialogs";
+import { AdjustDialog, DecreaseDialog, EditBatchDialog, IncreaseDialog } from "./stock-dialogs";
 
 const movementLabels: Record<StockMovement["type"], string> = {
   received: "Received",
@@ -57,7 +57,7 @@ export function VariationStockView({ id }: { id: string }) {
                 <Printer className="size-4" aria-hidden /> Print labels
               </Button>
             )}
-            <Button type="button" variant="secondary" onClick={() => setDialog({ type: "reduce" })} disabled={stock.onHand === 0}>
+            <Button type="button" variant="secondary" onClick={() => setDialog({ type: "reduce" })} disabled={stock.onHand + stock.expired === 0}>
               <Minus className="size-4" aria-hidden /> Decrease
             </Button>
             <Button type="button" onClick={() => setDialog({ type: "receive" })}>
@@ -103,8 +103,8 @@ export function VariationStockView({ id }: { id: string }) {
                   {[
                     batch.batchNumber && `Batch ${batch.batchNumber}`,
                     `received ${formatDay(batch.receivedDate)}`,
-                    batch.supplier,
                     batch.unitCost !== null && `cost ${formatPrice(batch.unitCost)}`,
+                    batch.unitPrice !== null && `selling ${formatPrice(batch.unitPrice)}`,
                   ]
                     .filter(Boolean)
                     .join(" · ")}
@@ -129,7 +129,7 @@ export function VariationStockView({ id }: { id: string }) {
           {movements.map((movement) => (
             <li key={movement.id} className="flex justify-between gap-4 px-4 py-3 text-sm">
               <div className="min-w-0">
-                <p className="text-gray-900">{movementLabels[movement.type]}</p>
+                <p className="text-gray-900">{movement.reasonLabel ?? movementLabels[movement.type]}</p>
                 <p className="break-words text-xs text-gray-500">
                   {[
                     new Date(movement.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }),
@@ -149,7 +149,16 @@ export function VariationStockView({ id }: { id: string }) {
         </ul>
       </section>
 
-      {dialog?.type === "receive" && <ReceiveDialog variationId={id} expiryRequired={expiryRequired} onClose={close} onDone={done} />}
+      {dialog?.type === "receive" && (
+        <IncreaseDialog
+          variationId={id}
+          expiryRequired={expiryRequired}
+          now={{ cost: String(variation.costPrice ?? ""), price: String(variation.price ?? ""), oldPrice: String(variation.compareAtPrice ?? "") }}
+          onHand={stock.onHand}
+          onClose={close}
+          onDone={done}
+        />
+      )}
       {dialog?.type === "labels" && variation.barcode && (
         <PrintLabelsDialog
           product={product.name}
@@ -161,7 +170,7 @@ export function VariationStockView({ id }: { id: string }) {
           onClose={close}
         />
       )}
-      {dialog?.type === "reduce" && <ReduceDialog variationId={id} onHand={stock.onHand} onClose={close} onDone={done} />}
+      {dialog?.type === "reduce" && <DecreaseDialog variationId={id} onHand={stock.onHand} expired={stock.expired} onClose={close} onDone={done} />}
       {dialog?.type === "edit" && <EditBatchDialog batch={dialog.batch} expiryRequired={expiryRequired} onClose={close} onDone={done} />}
       {dialog?.type === "adjust" && <AdjustDialog batch={dialog.batch} onClose={close} onDone={done} />}
     </div>

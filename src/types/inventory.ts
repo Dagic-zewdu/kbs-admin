@@ -30,7 +30,8 @@ export interface Batch {
   quantityReceived: number;
   quantityOnHand: number;
   unitCost: number | null;
-  supplier: string | null;
+  /** The selling price set with this delivery */
+  unitPrice: number | null;
   receivedDate: string;
 }
 
@@ -40,6 +41,8 @@ export interface StockMovement {
   /** + in, − out */
   quantity: number;
   quantityAfter: number;
+  /** Why units were taken out */
+  reasonLabel: string | null;
   reason: string | null;
   batchNumber: string | null;
   expiryDate: string | null;
@@ -48,7 +51,7 @@ export interface StockMovement {
 }
 
 export interface VariationStockDetail {
-  variation: Omit<InventoryItem, "product" | "stock">;
+  variation: Omit<InventoryItem, "product" | "stock"> & { costPrice: number | null; compareAtPrice: number | null };
   product: InventoryItem["product"];
   expiryRequired: boolean;
   stock: VariationStock;
@@ -60,19 +63,21 @@ export interface BatchDetails {
   batchNumber: string | null;
   expiryDate: string | null;
   manufacturingDate: string | null;
-  unitCost: number | null;
-  supplier: string | null;
-}
-
-export interface ReduceStock {
-  type: "damaged" | "corrected";
-  quantity: number;
-  reason: string;
+  /** Left out = the variation's prices */
+  unitCost?: number | null;
+  unitPrice?: number | null;
 }
 
 export type ReceiveBatch = BatchDetails & { quantity: number };
-export interface AdjustBatch {
-  type: "damaged" | "returned" | "corrected";
+
+/** Why units are taken out of stock */
+export type ReduceReason = "damaged" | "lost" | "expired" | "tester" | "gift" | "supplier_return" | "wrong_count" | "other";
+export interface ReduceStock {
+  reasonCode: ReduceReason;
   quantity: number;
   reason: string;
 }
+
+export type AdjustBatch =
+  | { type: "damaged"; reasonCode: ReduceReason; quantity: number; reason: string }
+  | { type: "returned" | "corrected"; quantity: number; reason: string };

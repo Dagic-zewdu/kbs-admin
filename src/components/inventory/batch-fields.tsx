@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { RequiredMark } from "@/components/ui/required-mark";
-import { decimalText, toNumber, wholeText } from "@/lib/numbers";
+import { wholeText } from "@/lib/numbers";
 import type { BatchDetails, ReceiveBatch } from "@/types/inventory";
 
 /** A batch while typing */
@@ -11,23 +11,19 @@ export interface BatchForm {
   expiryDate: string;
   batchNumber: string;
   manufacturingDate: string;
-  unitCost: string;
-  supplier: string;
 }
 
-export const emptyBatch: BatchForm = { quantity: "", expiryDate: "", batchNumber: "", manufacturingDate: "", unitCost: "", supplier: "" };
+export const emptyBatch: BatchForm = { quantity: "", expiryDate: "", batchNumber: "", manufacturingDate: "" };
 
 export const toBatchDetails = (form: BatchForm): BatchDetails => ({
   batchNumber: form.batchNumber.trim() || null,
   expiryDate: form.expiryDate || null,
   manufacturingDate: form.manufacturingDate || null,
-  unitCost: toNumber(form.unitCost),
-  supplier: form.supplier.trim() || null,
 });
 
 export const toReceiveBatch = (form: BatchForm): ReceiveBatch => ({ quantity: Number(form.quantity), ...toBatchDetails(form) });
 
-const inputClasses =
+export const inputClasses =
   "h-11 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 sm:h-10";
 
 export function Field({ label, isRequired, children }: { label: string; isRequired?: boolean; children: React.ReactNode }) {
@@ -48,14 +44,16 @@ interface BatchFieldsProps {
   expiryRequired: boolean;
   /** false when correcting a batch: quantities change only through adjustments */
   withQuantity?: boolean;
+  /** Shown right after quantity and expiry, e.g. the prices */
+  children?: React.ReactNode;
 }
 
 /** Quantity and expiry first; the rest under "More" */
-export function BatchFields({ value, onChange, expiryRequired, withQuantity = true }: BatchFieldsProps) {
-  const [showMore, setShowMore] = useState(!withQuantity || Boolean(value.batchNumber || value.unitCost || value.supplier || value.manufacturingDate));
+export function BatchFields({ value, onChange, expiryRequired, withQuantity = true, children }: BatchFieldsProps) {
+  const [showMore, setShowMore] = useState(!withQuantity || Boolean(value.batchNumber || value.manufacturingDate));
   return (
     <div className="space-y-3">
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         {withQuantity && (
           <Field label="Quantity" isRequired>
             <input
@@ -70,18 +68,19 @@ export function BatchFields({ value, onChange, expiryRequired, withQuantity = tr
         <Field label={expiryRequired ? "Expiry date" : "Expiry date (optional)"} isRequired={expiryRequired}>
           <input type="date" value={value.expiryDate} onChange={(event) => onChange({ expiryDate: event.target.value })} className={inputClasses} />
         </Field>
-        <Field label="Batch number (optional)">
-          <input
-            value={value.batchNumber}
-            maxLength={60}
-            onChange={(event) => onChange({ batchNumber: event.target.value })}
-            placeholder="A2309"
-            className={inputClasses}
-          />
-        </Field>
+        {children}
       </div>
       {showMore ? (
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Batch number (optional)">
+            <input
+              value={value.batchNumber}
+              maxLength={60}
+              onChange={(event) => onChange({ batchNumber: event.target.value })}
+              placeholder="A2309"
+              className={inputClasses}
+            />
+          </Field>
           <Field label="Made on (optional)">
             <input
               type="date"
@@ -90,22 +89,10 @@ export function BatchFields({ value, onChange, expiryRequired, withQuantity = tr
               className={inputClasses}
             />
           </Field>
-          <Field label="Cost per unit, ETB (private)">
-            <input
-              inputMode="decimal"
-              value={value.unitCost}
-              onChange={(event) => onChange({ unitCost: decimalText(event.target.value) })}
-              placeholder="800"
-              className={inputClasses}
-            />
-          </Field>
-          <Field label="Supplier (optional)">
-            <input value={value.supplier} maxLength={150} onChange={(event) => onChange({ supplier: event.target.value })} className={inputClasses} />
-          </Field>
         </div>
       ) : (
         <button type="button" onClick={() => setShowMore(true)} className="min-h-9 text-sm font-medium text-brand-700 hover:underline">
-          More: made on, cost, supplier
+          More: batch number, made on
         </button>
       )}
     </div>

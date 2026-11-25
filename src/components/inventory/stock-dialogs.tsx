@@ -1,48 +1,92 @@
 "use client";
 
 import { useState } from "react";
+import { PriceSummary } from "@/components/products/price-summary";
 import { getErrorMessage } from "@/lib/api-error";
-import { wholeText } from "@/lib/numbers";
+import { formatPrice } from "@/lib/labels";
+import { decimalText, toNumber, wholeText } from "@/lib/numbers";
 import { useAdjustBatchMutation, useReceiveBatchMutation, useReduceStockMutation, useUpdateBatchMutation } from "@/store/api/inventory.api";
-import type { AdjustBatch, Batch, ReduceStock, VariationStock } from "@/types/inventory";
-import { BatchFields, emptyBatch, Field, toBatchDetails, toReceiveBatch, type BatchForm } from "./batch-fields";
+import { useGetSettingsQuery } from "@/store/api/settings.api";
+import type { AdjustBatch, Batch, ReduceReason, VariationStockDetail } from "@/types/inventory";
+import { BatchFields, emptyBatch, Field, inputClasses, toBatchDetails, toReceiveBatch, type BatchForm } from "./batch-fields";
 import { FormDialog } from "./form-dialog";
 
 interface DoneProps {
   onClose: () => void;
-  onDone: (message: string, stock: VariationStock) => void;
+  onDone: (message: string, changed: VariationStockDetail) => void;
 }
 
-interface ReceiveDialogProps extends DoneProps {
+/** The variation's prices now, as typed */
+export interface PricesNow {
+  cost: string;
+  price: string;
+  oldPrice: string;
+}
+
+interface IncreaseDialogProps extends DoneProps {
   variationId: string;
   expiryRequired: boolean;
-  title?: string;
-  submitLabel?: string;
+  now: PricesNow;
+  /** Already in stock */
+  onHand: number;
 }
 
-export function ReceiveDialog({ variationId, expiryRequired, title = "Receive stock", submitLabel = "Receive", onClose, onDone }: ReceiveDialogProps) {
+/** A delivery: how many, when they expire, and their prices */
+export function IncreaseDialog({ variationId, expiryRequired, now, onHand, onClose, onDone }: IncreaseDialogProps) {
   const [form, setForm] = useState<BatchForm>(emptyBatch);
+  const [costText, setCostText] = useState(now.cost);
+  const [priceText, setPriceText] = useState(now.price);
   const [localError, setLocalError] = useState("");
   const [receive, { isLoading, error }] = useReceiveBatchMutation();
+  const settings = useGetSettingsQuery().data?.data;
+  const cost = toNumber(costText);
+  const price = toNumber(priceText);
+  const isPriceChanged = price !== null && price > 0 && price !== toNumber(now.price);
+  const losesDiscount = price !== null && toNumber(now.oldPrice) !== null && price >= Number(now.oldPrice);
 
   const submit = async () => {
-    if (!(Number(form.quantity) > 0)) return setLocalError("Enter how many units were received.");
+    if (!(Number(form.quantity) > 0)) return setLocalError("Enter how many units to add.");
     if (expiryRequired && !form.expiryDate) return setLocalError("Enter the expiry date from the package.");
+    if (cost === null || !Number.isFinite(cost)) return setLocalError("Enter the cost price of one unit.");
+    if (price === null || !(price > 0)) return setLocalError("Enter the selling price of one unit.");
     setLocalError("");
-    const result = await receive({ variationId, ...toReceiveBatch(form) });
-    if (result.data) onDone(`${form.quantity} units were received.`, result.data.data.stock);
+    const result = await receive({ variationId, ...toReceiveBatch(form), unitCost: cost, unitPrice: price });
+    if (result.data) onDone(`${form.quantity} units were added.`, result.data.data);
+  };
+  const typing = (apply: () => void) => {
+    apply();
+    setLocalError("");
   };
 
   return (
-    <FormDialog
-      title={title}
-      submitLabel={submitLabel}
-      isLoading={isLoading}
-      error={localError || getErrorMessage(error)}
-      onSubmit={submit}
-      onClose={onClose}
-    >
-      <BatchFields value={form} onChange={(change) => setForm({ ...form, ...change })} expiryRequired={expiryRequired} />
+    <FormDialog title="Increase quantity" submitLabel="Increase" isLoading={isLoading} error={localError || getErrorMessage(error)} onSubmit={submit} onClose={onClose}>
+      <BatchFields value={form} onChange={(change) => typing(() => setForm({ ...form, ...change }))} expiryRequired={expiryRequired}>
+        <Field label="Cost price of one unit, ETB" isRequired>
+          <input
+            inputMode="decimal"
+            value={costText}
+            onChange={(event) => typing(() => setCostText(decimalText(event.target.value)))}
+            placeholder="1000"
+            className={inputClasses}
+          />
+        </Field>
+        <Field label={settings?.vatEnabled ? "Selling price of one unit, before VAT" : "Selling price of one unit, ETB"} isRequired>
+          <input
+            inputMode="decimal"
+            value={priceText}
+            onChange={(event) => typing(() => setPriceText(decimalText(event.target.value)))}
+            placeholder="1450"
+            className={inputClasses}
+          />
+        </Field>
+      </BatchFields>
+      <PriceSummary price={price} cost={cost} settings={settings} />
+      {isPriceChanged && toNumber(now.price) !== null && (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-sm text-amber-900">
+          The selling price changes from {formatPrice(toNumber(now.price))} to {formatPrice(price)}
+          {onHand > 0 ? `, also for the ${onHand} units already in stock` : ""}.{losesDiscount && " The old selling price is removed."}
+        </p>
+      )}
     </FormDialog>
   );
 }
@@ -53,130 +97,170 @@ export function EditBatchDialog({ batch, expiryRequired, onClose, onDone }: Done
     expiryDate: batch.expiryDate ?? "",
     batchNumber: batch.batchNumber ?? "",
     manufacturingDate: batch.manufacturingDate ?? "",
-    unitCost: batch.unitCost === null ? "" : String(batch.unitCost),
-    supplier: batch.supplier ?? "",
   });
+  const [costText, setCostText] = useState(batch.unitCost === null ? "" : String(batch.unitCost));
   const [update, { isLoading, error }] = useUpdateBatchMutation();
 
   const submit = async () => {
-    const result = await update({ id: batch.id, ...toBatchDetails(form) });
-    if (result.data) onDone("The batch was saved.", result.data.data.stock);
+    const result = await update({ id: batch.id, ...toBatchDetails(form), unitCost: toNumber(costText) });
+    if (result.data) onDone("The batch was saved.", result.data.data);
   };
 
   return (
     <FormDialog title="Correct the batch" submitLabel="Save" isLoading={isLoading} error={getErrorMessage(error)} onSubmit={submit} onClose={onClose}>
-      <BatchFields value={form} onChange={(change) => setForm({ ...form, ...change })} expiryRequired={expiryRequired} withQuantity={false} />
+      <BatchFields value={form} onChange={(change) => setForm({ ...form, ...change })} expiryRequired={expiryRequired} withQuantity={false}>
+        <Field label="Cost price of these units, ETB (optional)">
+          <input inputMode="decimal" value={costText} onChange={(event) => setCostText(decimalText(event.target.value))} className={inputClasses} />
+        </Field>
+      </BatchFields>
     </FormDialog>
   );
 }
 
-const reasons: { type: ReduceStock["type"]; label: string }[] = [
-  { type: "damaged", label: "Damaged or lost" },
-  { type: "corrected", label: "Wrong count: there are fewer" },
+const reasons: { value: ReduceReason; label: string }[] = [
+  { value: "damaged", label: "Damaged" },
+  { value: "lost", label: "Lost or stolen" },
+  { value: "expired", label: "Expired" },
+  { value: "tester", label: "Used as a tester" },
+  { value: "gift", label: "Given as a gift" },
+  { value: "supplier_return", label: "Sent back to the supplier" },
+  { value: "wrong_count", label: "Wrong count: there are fewer" },
+  { value: "other", label: "Other" },
 ];
+const NOTE_MIN = 3;
 
-/** Fewer units, without choosing a batch */
-export function ReduceDialog({ variationId, onHand, onClose, onDone }: DoneProps & { variationId: string; onHand: number }) {
-  const [type, setType] = useState<ReduceStock["type"]>("damaged");
+interface DecreaseDialogProps extends DoneProps {
+  variationId: string;
+  onHand: number;
+  expired: number;
+}
+
+/** Fewer units, without choosing a batch. Always with a reason. */
+export function DecreaseDialog({ variationId, onHand, expired, onClose, onDone }: DecreaseDialogProps) {
+  const [reasonCode, setReasonCode] = useState<ReduceReason | "">("");
   const [quantity, setQuantity] = useState("");
-  const [reason, setReason] = useState("");
+  const [note, setNote] = useState("");
   const [localError, setLocalError] = useState("");
   const [reduce, { isLoading, error }] = useReduceStockMutation();
   const units = Number(quantity);
-  const inputClasses =
-    "h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 sm:h-10";
+  const isExpired = reasonCode === "expired";
+  const available = isExpired ? expired : onHand;
+  const typing = (apply: () => void) => {
+    apply();
+    setLocalError("");
+  };
 
   const submit = async () => {
+    if (!reasonCode) return setLocalError("Choose why.");
     if (!(units > 0)) return setLocalError("Enter how many units to take away.");
-    if (units > onHand) return setLocalError(`Only ${onHand} units are in stock.`);
-    if (type === "corrected" && reason.trim().length < 3) return setLocalError("Say why it's corrected.");
+    if (units > available) return setLocalError(`Only ${available} ${isExpired ? "expired " : ""}units are in stock.`);
+    if (note.trim().length < NOTE_MIN) return setLocalError("Write what happened.");
     setLocalError("");
-    const result = await reduce({ variationId, type, quantity: units, reason: reason.trim() });
-    if (result.data) onDone(`${units} units were taken away.`, result.data.data.stock);
+    const result = await reduce({ variationId, reasonCode, quantity: units, reason: note.trim() });
+    if (result.data) onDone(`${units} units were taken away.`, result.data.data);
   };
 
   return (
     <FormDialog title="Decrease quantity" submitLabel="Decrease" isLoading={isLoading} error={localError || getErrorMessage(error)} onSubmit={submit} onClose={onClose}>
-      <p className="text-sm text-gray-600">{onHand} in stock. The units that expire first are taken away.</p>
+      <p className="text-sm text-gray-600">
+        {isExpired ? `${expired} expired units.` : `${onHand} in stock. The units that expire first are taken away.`}
+      </p>
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="How many to take away" isRequired>
-          <input inputMode="numeric" value={quantity} onChange={(event) => {
-              setQuantity(wholeText(event.target.value).slice(0, 7));
-              setLocalError("");
-            }} className={inputClasses} />
-        </Field>
         <Field label="Why" isRequired>
-          <select value={type} onChange={(event) => setType(event.target.value as ReduceStock["type"])} className={inputClasses}>
+          <select value={reasonCode} onChange={(event) => typing(() => setReasonCode(event.target.value as ReduceReason | ""))} className={inputClasses}>
+            <option value="">Choose why</option>
             {reasons.map((item) => (
-              <option key={item.type} value={item.type}>
+              <option key={item.value} value={item.value}>
                 {item.label}
               </option>
             ))}
           </select>
         </Field>
+        <Field label="How many to take away" isRequired>
+          <input
+            inputMode="numeric"
+            value={quantity}
+            onChange={(event) => typing(() => setQuantity(wholeText(event.target.value).slice(0, 7)))}
+            className={inputClasses}
+          />
+        </Field>
       </div>
-      <Field label={type === "corrected" ? "Note" : "Note (optional)"} isRequired={type === "corrected"}>
-        <input value={reason} maxLength={300} onChange={(event) => setReason(event.target.value)} className={inputClasses} />
+      <Field label="What happened" isRequired>
+        <input
+          value={note}
+          maxLength={300}
+          onChange={(event) => typing(() => setNote(event.target.value))}
+          placeholder="The bottle broke in the store"
+          className={inputClasses}
+        />
       </Field>
-      {units > 0 && units <= onHand && (
+      {units > 0 && units <= available && (
         <p className="text-sm text-gray-700">
-          After this: <strong className="font-semibold">{onHand - units}</strong> in stock
+          After this: <strong className="font-semibold">{available - units}</strong> {isExpired ? "expired units" : "in stock"}
         </p>
       )}
     </FormDialog>
   );
 }
 
-const adjustments: { type: AdjustBatch["type"]; label: string; quantityLabel: string }[] = [
-  { type: "damaged", label: "Damaged or lost", quantityLabel: "How many units" },
-  { type: "returned", label: "Returned by a customer", quantityLabel: "How many units" },
-  { type: "corrected", label: "Counted again", quantityLabel: "Units there really are" },
+type Adjustment = ReduceReason | "returned" | "recount";
+const adjustments: { value: Adjustment; label: string }[] = [
+  // Fewer by a wrong count is "Counted again" here: the batch is known
+  ...reasons.filter((item) => item.value !== "wrong_count"),
+  { value: "returned", label: "Returned by a customer" },
+  { value: "recount", label: "Counted again" },
 ];
 
+/** One batch. "Counted again" sets the number there really is. */
 export function AdjustDialog({ batch, onClose, onDone }: DoneProps & { batch: Batch }) {
-  const [type, setType] = useState<AdjustBatch["type"]>("damaged");
+  const [what, setWhat] = useState<Adjustment | "">("");
   const [quantity, setQuantity] = useState("");
-  const [reason, setReason] = useState("");
+  const [note, setNote] = useState("");
   const [localError, setLocalError] = useState("");
   const [adjust, { isLoading, error }] = useAdjustBatchMutation();
-  const current = adjustments.find((item) => item.type === type)!;
-  const inputClasses =
-    "h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 sm:h-10";
+  const noteRequired = what !== "returned";
+  const typing = (apply: () => void) => {
+    apply();
+    setLocalError("");
+  };
 
   const submit = async () => {
-    if (quantity === "" || (type !== "corrected" && Number(quantity) === 0)) return setLocalError("Enter the number of units.");
-    if (type === "corrected" && reason.trim().length < 3) return setLocalError("Say why it's corrected.");
+    if (!what) return setLocalError("Choose what happened.");
+    if (quantity === "" || (what !== "recount" && Number(quantity) === 0)) return setLocalError("Enter the number of units.");
+    if (noteRequired && note.trim().length < NOTE_MIN) return setLocalError("Write what happened.");
     setLocalError("");
-    const result = await adjust({ id: batch.id, type, quantity: Number(quantity), reason: reason.trim() });
-    if (result.data) onDone("The stock was changed.", result.data.data.stock);
+    const common = { quantity: Number(quantity), reason: note.trim() };
+    const body: AdjustBatch =
+      what === "returned" ? { type: "returned", ...common } : what === "recount" ? { type: "corrected", ...common } : { type: "damaged", reasonCode: what, ...common };
+    const result = await adjust({ id: batch.id, ...body });
+    if (result.data) onDone("The stock was changed.", result.data.data);
   };
 
   return (
-    <FormDialog
-      title="Change stock"
-      submitLabel="Change"
-      isLoading={isLoading}
-      error={localError || getErrorMessage(error)}
-      onSubmit={submit}
-      onClose={onClose}
-    >
+    <FormDialog title="Change stock" submitLabel="Change" isLoading={isLoading} error={localError || getErrorMessage(error)} onSubmit={submit} onClose={onClose}>
       <p className="text-sm text-gray-600">This batch has {batch.quantityOnHand} units.</p>
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="What happened" isRequired>
-          <select value={type} onChange={(event) => setType(event.target.value as AdjustBatch["type"])} className={inputClasses}>
+        <Field label="Why" isRequired>
+          <select value={what} onChange={(event) => typing(() => setWhat(event.target.value as Adjustment | ""))} className={inputClasses}>
+            <option value="">Choose why</option>
             {adjustments.map((item) => (
-              <option key={item.type} value={item.type}>
+              <option key={item.value} value={item.value}>
                 {item.label}
               </option>
             ))}
           </select>
         </Field>
-        <Field label={current.quantityLabel} isRequired>
-          <input inputMode="numeric" value={quantity} onChange={(event) => setQuantity(wholeText(event.target.value).slice(0, 7))} className={inputClasses} />
+        <Field label={what === "recount" ? "Units there really are" : "How many units"} isRequired>
+          <input
+            inputMode="numeric"
+            value={quantity}
+            onChange={(event) => typing(() => setQuantity(wholeText(event.target.value).slice(0, 7)))}
+            className={inputClasses}
+          />
         </Field>
       </div>
-      <Field label={type === "corrected" ? "Reason" : "Reason (optional)"} isRequired={type === "corrected"}>
-        <input value={reason} maxLength={300} onChange={(event) => setReason(event.target.value)} className={inputClasses} />
+      <Field label={noteRequired ? "What happened" : "Note (optional)"} isRequired={noteRequired}>
+        <input value={note} maxLength={300} onChange={(event) => typing(() => setNote(event.target.value))} className={inputClasses} />
       </Field>
     </FormDialog>
   );

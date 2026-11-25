@@ -6,13 +6,13 @@ import { useState } from "react";
 import { BarcodeField } from "@/components/barcode/barcode-field";
 import { BatchFields, emptyBatch, Field, type BatchForm } from "@/components/inventory/batch-fields";
 import { RequiredMark } from "@/components/ui/required-mark";
-import { ReceiveDialog, ReduceDialog } from "@/components/inventory/stock-dialogs";
+import { DecreaseDialog, IncreaseDialog } from "@/components/inventory/stock-dialogs";
 import { Button } from "@/components/ui/button";
 import { PriceSummary } from "./price-summary";
 import { formatDay } from "@/lib/labels";
 import { decimalText, toNumber, wholeText } from "@/lib/numbers";
 import { useGetSettingsQuery } from "@/store/api/settings.api";
-import type { VariationStock } from "@/types/inventory";
+import type { VariationStock, VariationStockDetail } from "@/types/inventory";
 import type { SizeUnit, VariationType } from "@/types/product";
 
 /** A row while editing: text fields stay text until saving */
@@ -75,7 +75,7 @@ interface VariationEditorProps {
   rows: VariationRow[];
   onChange: (type: VariationType, rows: VariationRow[]) => void;
   /** The stock was changed and saved */
-  onStockChange: (id: string, stock: VariationStock) => void;
+  onStockChange: (id: string, changed: VariationStockDetail) => void;
   productId?: string;
   expiryRequired: boolean;
 }
@@ -147,7 +147,7 @@ export function VariationEditor({ type, rows, onChange, onStockChange, productId
               type={type}
               row={row}
               onChange={(change) => changeRow(row.key, change)}
-              onStockChange={(stock) => row.id && onStockChange(row.id, stock)}
+              onStockChange={(changed) => row.id && onStockChange(row.id, changed)}
               productId={productId}
               expiryRequired={expiryRequired}
             />
@@ -168,7 +168,7 @@ interface VariationFieldsProps {
   type: VariationType;
   row: VariationRow;
   onChange: (change: Partial<VariationRow>) => void;
-  onStockChange: (stock: VariationStock) => void;
+  onStockChange: (changed: VariationStockDetail) => void;
   productId?: string;
   expiryRequired: boolean;
 }
@@ -294,7 +294,7 @@ function Quantity({ row, onChange, onStockChange, expiryRequired }: Pick<Variati
   const [notice, setNotice] = useState("");
   const stock = row.stock;
   const close = () => setDialog(null);
-  const done = (message: string, changed: VariationStock) => {
+  const done = (message: string, changed: VariationStockDetail) => {
     setDialog(null);
     setNotice(message);
     onStockChange(changed);
@@ -314,7 +314,7 @@ function Quantity({ row, onChange, onStockChange, expiryRequired }: Pick<Variati
               </p>
             </div>
             <div className="flex w-full items-center justify-between gap-2 sm:w-auto">
-              <Button type="button" variant="secondary" className="px-2.5! sm:px-4!" onClick={() => setDialog("decrease")} disabled={stock.onHand === 0}>
+              <Button type="button" variant="secondary" className="px-2.5! sm:px-4!" onClick={() => setDialog("decrease")} disabled={stock.onHand + stock.expired === 0}>
                 <Minus className="size-4" aria-hidden /> Decrease
               </Button>
               <output className={`min-w-8 text-center text-lg font-semibold ${stock.onHand ? "text-gray-900" : "text-red-700"}`}>{stock.onHand}</output>
@@ -332,16 +332,16 @@ function Quantity({ row, onChange, onStockChange, expiryRequired }: Pick<Variati
             </Link>
           </div>
           {dialog === "increase" && (
-            <ReceiveDialog
+            <IncreaseDialog
               variationId={row.id}
               expiryRequired={expiryRequired}
-              title="Increase quantity"
-              submitLabel="Increase"
+              now={{ cost: row.costPrice, price: row.price, oldPrice: row.compareAtPrice }}
+              onHand={stock.onHand}
               onClose={close}
               onDone={done}
             />
           )}
-          {dialog === "decrease" && <ReduceDialog variationId={row.id} onHand={stock.onHand} onClose={close} onDone={done} />}
+          {dialog === "decrease" && <DecreaseDialog variationId={row.id} onHand={stock.onHand} expired={stock.expired} onClose={close} onDone={done} />}
         </>
       ) : (
         <>

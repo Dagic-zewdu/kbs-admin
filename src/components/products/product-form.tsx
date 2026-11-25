@@ -27,6 +27,7 @@ import {
   useUpdateProductMutation,
 } from "@/store/api/products.api";
 import type { Brand } from "@/types/brand";
+import type { VariationStockDetail } from "@/types/inventory";
 import type { Category } from "@/types/category";
 import type { AttributeValue, CategoryField, Product, ProductPhoto, VariationType } from "@/types/product";
 import { emptyAdvisorProfile } from "@/types/advisor";
@@ -293,6 +294,24 @@ export function ProductForm({ product }: { product?: Product }) {
     setNotice(then === "live" ? "Saved. It's live on the website." : then === "private" ? "Saved. Staff can sell it." : "Saved.");
   };
 
+  // Already saved, so nothing becomes unsaved. A delivery also sets the prices; a decrease keeps what is typed.
+  const applyStock = (id: string, { stock, variation }: VariationStockDetail) =>
+    setForm((current) => ({
+      ...current,
+      variations: current.variations.map((row) => {
+        if (row.id !== id) return row;
+        if (stock.batches === row.stock?.batches) return { ...row, stock };
+        return {
+          ...row,
+          stock,
+          costPrice: String(variation.costPrice ?? ""),
+          price: String(variation.price ?? ""),
+          // An old price that isn't higher any more is removed, as on the server
+          compareAtPrice: Number(row.compareAtPrice) > Number(variation.price) ? row.compareAtPrice : "",
+        };
+      }),
+    }));
+
   // The brand fills in its country, unless staff typed another one
   const chooseBrand = (brand: Brand | null) => {
     const typed = form.countryOfOrigin.trim();
@@ -395,10 +414,7 @@ export function ProductForm({ product }: { product?: Product }) {
             productId={product?.id}
             expiryRequired={expiryRequired}
             onChange={(variationType, variations) => change({ variationType, variations })}
-            onStockChange={(id, stock) =>
-              // Already saved, so nothing becomes unsaved
-              setForm((current) => ({ ...current, variations: current.variations.map((row) => (row.id === id ? { ...row, stock } : row)) }))
-            }
+            onStockChange={applyStock}
           />
         </Section>
 
