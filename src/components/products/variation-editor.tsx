@@ -2,8 +2,10 @@
 
 import { Boxes, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 import { BarcodeField } from "@/components/barcode/barcode-field";
 import { BatchFields, emptyBatch, Field, type BatchForm } from "@/components/inventory/batch-fields";
+import { RequiredMark } from "@/components/ui/required-mark";
 import { Button } from "@/components/ui/button";
 import { PriceSummary } from "./price-summary";
 import { formatDay } from "@/lib/labels";
@@ -173,7 +175,7 @@ function VariationFields({ type, row, onChange, productId, expiryRequired }: Var
     <>
       <div className="grid gap-3 sm:grid-cols-2">
         {nameField && (
-          <Field label={nameField.label}>
+          <Field label={nameField.label} isRequired>
             <span className="flex gap-2">
               <input
                 value={row.name}
@@ -196,7 +198,10 @@ function VariationFields({ type, row, onChange, productId, expiryRequired }: Var
           </Field>
         )}
         <div className="space-y-1.5">
-          <span className="block text-sm font-medium text-gray-700">{type === "size" ? "Size" : "Size (optional)"}</span>
+          <span className="block text-sm font-medium text-gray-700">
+            {type === "size" ? "Size" : "Size (optional)"}
+            {type === "size" && <RequiredMark />}
+          </span>
           <div className="flex gap-2">
             <input
               aria-label="Size"
@@ -220,10 +225,10 @@ function VariationFields({ type, row, onChange, productId, expiryRequired }: Var
         </div>
       </div>
 
-      <BarcodeField value={row.barcode} onChange={(barcode) => onChange({ barcode })} productId={productId} />
+      <BarcodeField isRequired value={row.barcode} onChange={(barcode) => onChange({ barcode })} productId={productId} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-        <Field label="Cost price, ETB">
+        <Field label="Cost price, ETB" isRequired>
           <input
             inputMode="decimal"
             value={row.costPrice}
@@ -232,7 +237,7 @@ function VariationFields({ type, row, onChange, productId, expiryRequired }: Var
             className={fullWidth}
           />
         </Field>
-        <Field label={settings?.vatEnabled ? "Selling price, before VAT" : "Selling price, ETB"}>
+        <Field label={settings?.vatEnabled ? "Selling price, before VAT" : "Selling price, ETB"} isRequired>
           <input
             inputMode="decimal"
             value={row.price}
@@ -253,16 +258,16 @@ function VariationFields({ type, row, onChange, productId, expiryRequired }: Var
       </div>
       <PriceSummary price={toNumber(row.price)} cost={toNumber(row.costPrice)} settings={settings} />
       <div className="grid grid-cols-2 gap-3">
-        <Field label="SKU">
+        <Field label="SKU (created for you)">
           <input
             value={row.sku}
             onChange={(event) => onChange({ sku: event.target.value.toUpperCase() })}
-            placeholder="Created for you"
+            placeholder="K12"
             maxLength={50}
             className={fullWidth}
           />
         </Field>
-        <Field label="Low-stock alert at">
+        <Field label="Low-stock alert at (optional)">
           <input
             inputMode="numeric"
             value={row.lowStockLevel}
@@ -273,30 +278,67 @@ function VariationFields({ type, row, onChange, productId, expiryRequired }: Var
         </Field>
       </div>
 
-      {row.stock?.batches ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-gray-50 p-3 text-sm">
-          <span className="text-gray-700">
-            <strong className="font-semibold text-gray-900">{row.stock.onHand}</strong> in stock
-            {row.stock.nextExpiry && <> · expires {formatDay(row.stock.nextExpiry)}</>}
-            {row.stock.expired > 0 && <span className="text-red-700"> · {row.stock.expired} expired</span>}
-          </span>
-          <Link href={`/inventory/${row.id}`} className="inline-flex min-h-9 items-center gap-1.5 font-medium text-brand-700 hover:underline">
-            <Boxes className="size-4" aria-hidden /> Manage stock
-          </Link>
-        </div>
-      ) : (
-        <fieldset className="rounded-lg bg-gray-50 p-3 sm:p-4">
-          <legend className="sr-only">First stock</legend>
-          <p aria-hidden className="mb-2 text-sm font-semibold text-gray-900">
-            First stock
-          </p>
-          <BatchFields
-            value={row.newBatch}
-            expiryRequired={expiryRequired}
-            onChange={(change) => onChange({ newBatch: { ...row.newBatch, ...change } })}
-          />
-        </fieldset>
-      )}
+      {/* Closed again once the added stock is saved */}
+      <Quantity key={row.stock?.batches ?? 0} row={row} onChange={onChange} expiryRequired={expiryRequired} />
     </>
+  );
+}
+
+/** How many there are of this variation, and adding more */
+function Quantity({ row, onChange, expiryRequired }: Pick<VariationFieldsProps, "row" | "onChange" | "expiryRequired">) {
+  const hasStock = Boolean(row.stock?.batches);
+  const [isAdding, setIsAdding] = useState(!hasStock || Boolean(row.newBatch.quantity));
+
+  return (
+    <fieldset className="space-y-3 rounded-lg bg-gray-50 p-3 sm:p-4">
+      <legend className="sr-only">Quantity in stock</legend>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+        <p className="text-gray-700">
+          <span className="font-semibold text-gray-900">Quantity in stock{hasStock && `: ${row.stock?.onHand}`}</span>
+          {row.stock?.nextExpiry && <> · expires {formatDay(row.stock.nextExpiry)}</>}
+          {Boolean(row.stock?.expired) && <span className="text-red-700"> · {row.stock?.expired} expired</span>}
+        </p>
+        {hasStock && (
+          <span className="flex flex-wrap gap-x-4">
+            {!isAdding && (
+              <button
+                type="button"
+                onClick={() => setIsAdding(true)}
+                className="inline-flex min-h-9 items-center gap-1.5 font-medium text-brand-700 hover:underline"
+              >
+                <Plus className="size-4" aria-hidden /> Add quantity
+              </button>
+            )}
+            <Link href={`/inventory/${row.id}`} className="inline-flex min-h-9 items-center gap-1.5 font-medium text-brand-700 hover:underline">
+              <Boxes className="size-4" aria-hidden /> Manage stock
+            </Link>
+          </span>
+        )}
+      </div>
+      {isAdding && (
+        <>
+          <BatchFields value={row.newBatch} expiryRequired={expiryRequired} onChange={(change) => onChange({ newBatch: { ...row.newBatch, ...change } })} />
+          {hasStock && (
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              {Number(row.newBatch.quantity) > 0 && (
+                <span className="text-gray-700">
+                  After saving: <strong className="font-semibold">{(row.stock?.onHand ?? 0) + Number(row.newBatch.quantity)}</strong>
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  onChange({ newBatch: emptyBatch });
+                  setIsAdding(false);
+                }}
+                className="min-h-9 font-medium text-gray-600 hover:underline"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </fieldset>
   );
 }

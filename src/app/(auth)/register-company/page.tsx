@@ -64,9 +64,9 @@ export default function RegisterCompanyPage() {
 
         <fieldset className="space-y-4">
           <legend className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Company</legend>
-          <Input label="Company name" autoComplete="organization" error={errors.companyName?.message} {...register("companyName")} />
+          <Input label="Company name" isRequired autoComplete="organization" error={errors.companyName?.message} {...register("companyName")} />
           <div className="grid gap-3 sm:grid-cols-2">
-            <Input label="Phone" type="tel" placeholder="+251 9..." error={errors.phone?.message} {...register("phone")} />
+            <Input label="Phone" isRequired type="tel" placeholder="+251 9..." error={errors.phone?.message} {...register("phone")} />
             <Input label="Second phone (optional)" type="tel" error={errors.secondaryPhone?.message} {...register("secondaryPhone")} />
           </div>
           <Input label="Company email (optional)" type="email" error={errors.email?.message} {...register("email")} />
@@ -85,11 +85,11 @@ export default function RegisterCompanyPage() {
         <fieldset className="space-y-4">
           <legend className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">You</legend>
           <div className="grid grid-cols-2 gap-3">
-            <Input label="First name" autoComplete="given-name" error={errors.contactFirstName?.message} {...register("contactFirstName")} />
-            <Input label="Last name" autoComplete="family-name" error={errors.contactLastName?.message} {...register("contactLastName")} />
+            <Input label="First name" isRequired autoComplete="given-name" error={errors.contactFirstName?.message} {...register("contactFirstName")} />
+            <Input label="Last name (optional)" autoComplete="family-name" error={errors.contactLastName?.message} {...register("contactLastName")} />
           </div>
           <Input
-            label="Your email"
+            label="Your email" isRequired
             type="email"
             autoComplete="email"
             error={errors.contactEmail?.message}

@@ -13,6 +13,7 @@ import { BrandLogoUpload } from "./brand-logo-upload";
 
 interface BrandSelectProps {
   label: string;
+  isRequired?: boolean;
   value: Brand | null;
   onChange: (brand: Brand | null, isNew?: boolean) => void;
   error?: string;

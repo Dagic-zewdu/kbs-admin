@@ -3,6 +3,7 @@
 import clsx from "clsx";
 import { Check, ChevronDown, Loader2, Plus, X } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { RequiredMark } from "./required-mark";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 
 /** What the API found for the typed text */
@@ -21,6 +22,7 @@ export interface CreatePanelProps<T> {
 
 interface CreateSelectProps<T> {
   label: string;
+  isRequired?: boolean;
   placeholder: string;
   clearLabel: string;
   value: T | null;
@@ -41,6 +43,7 @@ interface CreateSelectProps<T> {
  */
 export function CreateSelect<T extends { id: string }>({
   label,
+  isRequired,
   placeholder,
   clearLabel,
   value,
@@ -130,6 +133,7 @@ export function CreateSelect<T extends { id: string }>({
     <div ref={rootRef} className="relative space-y-1.5">
       <label htmlFor={inputId} className="block text-sm font-medium text-gray-700">
         {label}
+        {isRequired && <RequiredMark />}
       </label>
       <div className="relative">
         <input

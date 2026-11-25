@@ -3,7 +3,7 @@ import type { Brand } from "./brand";
 import type { ReceiveBatch, VariationStock } from "./inventory";
 import type { Category } from "./category";
 
-export type ProductStatus = "draft" | "private" | "live" | "archived";
+export type ProductStatus = "draft" | "private" | "live" | "inactive";
 export type VariationType = "none" | "size" | "shade" | "scent" | "pack";
 export type SizeUnit = "ml" | "g" | "oz" | "pcs" | "sheets";
 export type AttributeValue = string | number | boolean;
@@ -22,6 +22,10 @@ export interface ProductSummary {
   priceTo: number | null;
   /** Units that can be sold */
   onHand: number;
+  /** Of each variation, in order */
+  codes: { id: string; name: string; sku: string; barcode: string | null }[];
+  /** What is still needed before staff can sell it (private) */
+  missingToSell: string[];
   /** What is still needed before it can go live */
   missingToGoLive: string[];
   createdAt: string;

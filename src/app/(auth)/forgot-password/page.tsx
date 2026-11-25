@@ -58,7 +58,7 @@ export default function ForgotPasswordPage() {
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
         <Alert>{getErrorMessage(error)}</Alert>
-        <Input label="Email" type="email" autoComplete="email" error={formState.errors.email?.message} {...register("email")} />
+        <Input label="Email" isRequired type="email" autoComplete="email" error={formState.errors.email?.message} {...register("email")} />
         <Button type="submit" className="w-full" isLoading={isLoading}>
           Send reset link
         </Button>

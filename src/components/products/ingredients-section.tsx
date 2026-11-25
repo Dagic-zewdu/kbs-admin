@@ -2,6 +2,7 @@
 
 import { AlertTriangle } from "lucide-react";
 import { ChoiceChips } from "./choice-chips";
+import { PhraseList } from "./phrase-list";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
@@ -14,11 +15,14 @@ interface IngredientsSectionProps {
   text: string;
   claims: string[];
   monthsAfterOpening: string;
+  worksWith: string[];
+  avoidWith: string[];
+  onAdvisorChange: (change: { worksWith?: string[]; avoidWith?: string[] }) => void;
   onChange: (change: { ingredientsText?: string; claims?: string[]; monthsAfterOpening?: string }) => void;
 }
 
 /** The list from the package, with what it means shown while typing */
-export function IngredientsSection({ options, text, claims, monthsAfterOpening, onChange }: IngredientsSectionProps) {
+export function IngredientsSection({ options, text, claims, monthsAfterOpening, worksWith, avoidWith, onAdvisorChange, onChange }: IngredientsSectionProps) {
   const typed = useDebouncedValue(text, 600);
   const preview = usePreviewIngredientsQuery({ text: typed, claims }, { skip: !typed.trim() });
   const result = typed.trim() && typed === text ? preview.data?.data : undefined;
@@ -88,6 +92,26 @@ export function IngredientsSection({ options, text, claims, monthsAfterOpening, 
       )}
 
       <ChoiceChips label="Claims" hint="Only what the package says" options={options.claims} value={claims} onChange={(value) => onChange({ claims: value })} />
+      <div className="grid gap-4 md:grid-cols-2">
+        <PhraseList
+          label="Works well with"
+          placeholder="Hyaluronic acid"
+          value={worksWith}
+          onChange={(value) => onAdvisorChange({ worksWith: value })}
+          max={15}
+          maxLength={80}
+          splitOnComma
+        />
+        <PhraseList
+          label="Don't use with"
+          placeholder="Retinol"
+          value={avoidWith}
+          onChange={(value) => onAdvisorChange({ avoidWith: value })}
+          max={15}
+          maxLength={80}
+          splitOnComma
+        />
+      </div>
       <div className="sm:w-64">
         <Input
           label="Months after opening (optional)"

@@ -65,7 +65,7 @@ export function CategoryEditDialog({ category, categories, onClose, onSaved }: C
         <h2 id={titleId} className="text-base font-semibold text-gray-900">
           Edit category
         </h2>
-        <Input label="Name" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} required minLength={2} autoFocus />
+        <Input label="Name" isRequired value={name} onChange={(event) => setName(event.target.value)} maxLength={80} required minLength={2} autoFocus />
         <div className="space-y-1.5">
           <label htmlFor={parentFieldId} className="block text-sm font-medium text-gray-700">
             Where it belongs

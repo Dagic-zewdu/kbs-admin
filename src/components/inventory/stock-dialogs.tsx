@@ -98,7 +98,7 @@ export function AdjustDialog({ batch, onClose, onDone }: DoneProps & { batch: Ba
     >
       <p className="text-sm text-gray-600">This batch has {batch.quantityOnHand} units.</p>
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="What happened">
+        <Field label="What happened" isRequired>
           <select value={type} onChange={(event) => setType(event.target.value as AdjustBatch["type"])} className={inputClasses}>
             {adjustments.map((item) => (
               <option key={item.type} value={item.type}>
@@ -107,11 +107,11 @@ export function AdjustDialog({ batch, onClose, onDone }: DoneProps & { batch: Ba
             ))}
           </select>
         </Field>
-        <Field label={current.quantityLabel}>
+        <Field label={current.quantityLabel} isRequired>
           <input inputMode="numeric" value={quantity} onChange={(event) => setQuantity(wholeText(event.target.value).slice(0, 7))} className={inputClasses} />
         </Field>
       </div>
-      <Field label={type === "corrected" ? "Reason" : "Reason (optional)"}>
+      <Field label={type === "corrected" ? "Reason" : "Reason (optional)"} isRequired={type === "corrected"}>
         <input value={reason} maxLength={300} onChange={(event) => setReason(event.target.value)} className={inputClasses} />
       </Field>
     </FormDialog>

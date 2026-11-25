@@ -4,8 +4,9 @@ import { Lightbulb, Plus, X } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import type { AdvisorOptions, AdvisorProfile, Option } from "@/types/advisor";
+import type { AdvisorOptions, AdvisorProfile, CustomerQuestion, Option } from "@/types/advisor";
 import { ChoiceChips } from "./choice-chips";
+import { PhraseList } from "./phrase-list";
 
 const inputClasses =
   "h-11 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 sm:h-10";
@@ -20,6 +21,9 @@ const partLabels: Record<string, string> = {
   strength: "strength",
   texture: "texture",
   summary: "summary",
+  bodyAreas: "where it is used",
+  ageGroups: "age groups",
+  keyBenefits: "key benefits (Description step)",
   ingredients: "ingredient list",
 };
 
@@ -34,6 +38,9 @@ const missingParts = (profile: AdvisorProfile, hasIngredients: boolean) => {
     strength: Boolean(profile.strength),
     texture: Boolean(profile.texture),
     summary: Boolean(profile.summary?.trim()),
+    bodyAreas: profile.bodyAreas.length > 0,
+    ageGroups: profile.ageGroups.length > 0,
+    keyBenefits: profile.keyBenefits.length > 0,
     ingredients: hasIngredients,
   };
   return { missing: Object.keys(parts).filter((part) => !parts[part]), total: Object.keys(parts).length };
@@ -98,72 +105,108 @@ export function AdvisorSection({ options, value, hasIngredients, onChange }: Adv
         </p>
       </div>
 
-      <ChoiceChips label="What it does" hint="Up to 3" max={3} options={options.purposes} value={value.purposes} onChange={(purposes) => onChange({ purposes })} />
-      <ChoiceChips label="Concerns it helps" options={options.concerns} value={value.concerns} onChange={(concerns) => onChange({ concerns })} />
+      <Group title="What it does">
+        <ChoiceChips label="What it does" hint="Up to 3" max={3} options={options.purposes} value={value.purposes} onChange={(purposes) => onChange({ purposes })} />
+        <ChoiceChips label="Concerns it helps" options={options.concerns} value={value.concerns} onChange={(concerns) => onChange({ concerns })} />
+        <ChoiceChips label="Used on" options={options.bodyAreas} value={value.bodyAreas} onChange={(bodyAreas) => onChange({ bodyAreas })} />
+        <KeyIngredients value={value} onChange={onChange} />
+      </Group>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="space-y-4">
-          <ChoiceChips
-            label="Good for: skin"
-            options={options.skinTypes}
-            value={value.goodForSkin}
-            disabled={value.notForSkin}
-            onChange={(goodForSkin) => onChange({ goodForSkin })}
-          />
-          <ChoiceChips
-            label="Good for: hair"
-            options={options.hairTypes}
-            value={value.goodForHair}
-            disabled={value.notForHair}
-            onChange={(goodForHair) => onChange({ goodForHair })}
-          />
+      <Group title="Who it is for">
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="space-y-4">
+            <ChoiceChips
+              label="Good for: skin"
+              options={options.skinTypes}
+              value={value.goodForSkin}
+              disabled={value.notForSkin}
+              onChange={(goodForSkin) => onChange({ goodForSkin })}
+            />
+            <ChoiceChips
+              label="Good for: hair"
+              options={options.hairTypes}
+              value={value.goodForHair}
+              disabled={value.notForHair}
+              onChange={(goodForHair) => onChange({ goodForHair })}
+            />
+          </div>
+          <div className="space-y-4">
+            <ChoiceChips
+              label="Not for: skin"
+              options={options.skinTypes}
+              value={value.notForSkin}
+              disabled={value.goodForSkin}
+              onChange={(notForSkin) => onChange({ notForSkin })}
+            />
+            <ChoiceChips
+              label="Not for: hair"
+              options={options.hairTypes}
+              value={value.notForHair}
+              disabled={value.goodForHair}
+              onChange={(notForHair) => onChange({ notForHair })}
+            />
+          </div>
         </div>
-        <div className="space-y-4">
-          <ChoiceChips
-            label="Not for: skin"
-            options={options.skinTypes}
-            value={value.notForSkin}
-            disabled={value.goodForSkin}
-            onChange={(notForSkin) => onChange({ notForSkin })}
-          />
-          <ChoiceChips
-            label="Not for: hair"
-            options={options.hairTypes}
-            value={value.notForHair}
-            disabled={value.goodForHair}
-            onChange={(notForHair) => onChange({ notForHair })}
-          />
+        <ChoiceChips label="Age groups" options={options.ageGroups} value={value.ageGroups} onChange={(ageGroups) => onChange({ ageGroups })} />
+        <ChoiceChips label="Skin tones" hint="For makeup and sunscreen" options={options.skinTones} value={value.skinTones} onChange={(skinTones) => onChange({ skinTones })} />
+        <ChoiceChips label="Undertones" hint="For makeup" options={options.undertones} value={value.undertones} onChange={(undertones) => onChange({ undertones })} />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Select label="Made for" options={options.madeFor} value={value.madeFor} onChange={(madeFor) => onChange({ madeFor })} />
+          <Select label="Experience needed" options={options.experiences} value={value.experience} onChange={(experience) => onChange({ experience })} />
         </div>
-      </div>
+      </Group>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Select label="Routine step" options={options.routineSteps} value={value.routineStep} onChange={(routineStep) => onChange({ routineStep })} />
-        <Select label="When" options={options.timesOfDay} value={value.timeOfDay} onChange={(timeOfDay) => onChange({ timeOfDay })} />
-        <Select label="How often" options={options.frequencies} value={value.frequency} onChange={(frequency) => onChange({ frequency })} />
-        <Select label="Strength" options={options.strengths} value={value.strength} onChange={(strength) => onChange({ strength })} />
-        <Select label="Texture" options={options.textures} value={value.texture} onChange={(texture) => onChange({ texture })} />
-        <Select label="Feel" options={options.feels} value={value.feel} onChange={(feel) => onChange({ feel })} />
-      </div>
+      <Group title="How it is used">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Select label="Routine step" options={options.routineSteps} value={value.routineStep} onChange={(routineStep) => onChange({ routineStep })} />
+          <Select label="When" options={options.timesOfDay} value={value.timeOfDay} onChange={(timeOfDay) => onChange({ timeOfDay })} />
+          <Select label="How often" options={options.frequencies} value={value.frequency} onChange={(frequency) => onChange({ frequency })} />
+          <Select label="Results after" options={options.resultsAfter} value={value.resultsAfter} onChange={(resultsAfter) => onChange({ resultsAfter })} />
+        </div>
+        <ChoiceChips label="Best weather" options={options.weather} value={value.weather} onChange={(weather) => onChange({ weather })} />
+      </Group>
 
-      <KeyIngredients value={value} onChange={onChange} />
+      <Group title="How it feels">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Select label="Strength" options={options.strengths} value={value.strength} onChange={(strength) => onChange({ strength })} />
+          <Select label="Texture" options={options.textures} value={value.texture} onChange={(texture) => onChange({ texture })} />
+          <Select label="Feel" options={options.feels} value={value.feel} onChange={(feel) => onChange({ feel })} />
+          <Select label="Scent" options={options.scents} value={value.scent} onChange={(scent) => onChange({ scent })} />
+          <Select label="Finish (makeup)" options={options.finishes} value={value.finish} onChange={(finish) => onChange({ finish })} />
+          <Select label="Coverage (makeup)" options={options.coverages} value={value.coverage} onChange={(coverage) => onChange({ coverage })} />
+        </div>
+      </Group>
 
-      <ChoiceChips
-        label="Cautions"
-        hint="Others are added automatically from the ingredients"
-        options={options.cautions}
-        value={value.cautions}
-        onChange={(cautions) => onChange({ cautions })}
-      />
+      <Group title="Safety">
+        <ChoiceChips
+          label="Cautions"
+          hint="Others are added automatically from the ingredients"
+          options={options.cautions}
+          value={value.cautions}
+          onChange={(cautions) => onChange({ cautions })}
+        />
+      </Group>
 
-      <Textarea
-        label="Summary for the advisor"
-        rows={3}
-        maxLength={600}
-        value={value.summary ?? ""}
-        onChange={(event) => onChange({ summary: event.target.value })}
-        placeholder="Gentle low-pH gel cleanser for oily and combination skin, morning and night."
-      />
-      <Keywords value={value.keywords} onChange={(keywords) => onChange({ keywords })} />
+      <Group title="For the AI">
+        <Textarea
+          label="Summary for the advisor"
+          rows={3}
+          maxLength={600}
+          value={value.summary ?? ""}
+          onChange={(event) => onChange({ summary: event.target.value })}
+          placeholder="Gentle low-pH gel cleanser for oily and combination skin, morning and night."
+        />
+        <CustomerQuestions value={value.customerQuestions} onChange={(customerQuestions) => onChange({ customerQuestions })} />
+        <PhraseList
+          label="Search words"
+          placeholder="face wash, oily skin"
+          value={value.keywords}
+          onChange={(keywords) => onChange({ keywords })}
+          max={20}
+          maxLength={40}
+          splitOnComma
+        />
+      </Group>
     </div>
   );
 }
@@ -229,55 +272,56 @@ function PercentInput({ label, value, onChange }: { label: string; value: number
   );
 }
 
-function Keywords({ value, onChange }: { value: string[]; onChange: (value: string[]) => void }) {
-  const [text, setText] = useState("");
-  const add = () => {
-    const words = text
-      .split(",")
-      .map((word) => word.trim())
-      .filter((word) => word.length >= 2 && !value.some((item) => item.toLowerCase() === word.toLowerCase()));
-    if (words.length) onChange([...value, ...words].slice(0, 20));
-    setText("");
-  };
-
+function Group({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-2">
-      <label className="block space-y-1.5">
-        <span className="block text-sm font-medium text-gray-700">
-          Search words <span className="font-normal text-gray-500">Press Enter after each</span>
-        </span>
-        <input
-          value={text}
-          maxLength={200}
-          onChange={(event) => setText(event.target.value)}
-          onBlur={add}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault(); // never submits the form
-              add();
-            }
-          }}
-          placeholder="face wash, oily skin"
-          className={`${inputClasses} w-full`}
-        />
-      </label>
-      {value.length > 0 && (
-        <ul className="flex flex-wrap gap-2">
-          {value.map((word) => (
-            <li key={word} className="flex items-center gap-1 rounded-full bg-gray-100 pl-3 text-sm text-gray-700">
-              {word}
-              <button
-                type="button"
-                aria-label={`Remove ${word}`}
-                onClick={() => onChange(value.filter((item) => item !== word))}
-                className="flex size-8 items-center justify-center rounded-full hover:text-red-700"
-              >
-                <X className="size-3.5" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+    <section className="space-y-4 border-t border-gray-100 pt-5">
+      <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+      {children}
+    </section>
+  );
+}
+
+function CustomerQuestions({ value, onChange }: { value: CustomerQuestion[]; onChange: (value: CustomerQuestion[]) => void }) {
+  const set = (index: number, change: Partial<CustomerQuestion>) => onChange(value.map((item, position) => (position === index ? { ...item, ...change } : item)));
+  return (
+    <fieldset className="space-y-3">
+      <legend className="text-sm font-medium text-gray-700">
+        Questions customers ask <span className="font-normal text-gray-500">The AI answers with your words</span>
+      </legend>
+      {value.map((item, index) => (
+        <div key={index} className="flex gap-2 rounded-lg border border-gray-200 p-3">
+          <div className="min-w-0 flex-1 space-y-2">
+            <input
+              aria-label={`Question ${index + 1}`}
+              value={item.question}
+              maxLength={200}
+              placeholder="Can I use it every day?"
+              onChange={(event) => set(index, { question: event.target.value })}
+              className={`${inputClasses} w-full`}
+            />
+            <textarea
+              aria-label={`Answer ${index + 1}`}
+              rows={2}
+              value={item.answer}
+              maxLength={600}
+              placeholder="Yes, morning and night."
+              onChange={(event) => set(index, { answer: event.target.value })}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
+            />
+          </div>
+          <button
+            type="button"
+            aria-label={`Remove question ${index + 1}`}
+            onClick={() => onChange(value.filter((_, position) => position !== index))}
+            className="flex size-11 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-700 sm:size-10"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+      ))}
+      <Button type="button" variant="secondary" onClick={() => onChange([...value, { question: "", answer: "" }])} disabled={value.length >= 10}>
+        <Plus className="size-4" aria-hidden /> Add question
+      </Button>
+    </fieldset>
   );
 }

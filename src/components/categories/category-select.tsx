@@ -10,6 +10,7 @@ import { categoryPath, MAX_CATEGORY_LEVELS, type Category } from "@/types/catego
 
 interface CategorySelectProps {
   label: string;
+  isRequired?: boolean;
   value: Category | null;
   onChange: (category: Category | null, isNew?: boolean) => void;
   error?: string;

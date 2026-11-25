@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { RequiredMark } from "@/components/ui/required-mark";
 import { decimalText, toNumber, wholeText } from "@/lib/numbers";
 import type { BatchDetails, ReceiveBatch } from "@/types/inventory";
 
@@ -29,10 +30,13 @@ export const toReceiveBatch = (form: BatchForm): ReceiveBatch => ({ quantity: Nu
 const inputClasses =
   "h-11 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 sm:h-10";
 
-export function Field({ label, children }: { label: string; children: React.ReactNode }) {
+export function Field({ label, isRequired, children }: { label: string; isRequired?: boolean; children: React.ReactNode }) {
   return (
     <label className="block space-y-1.5">
-      <span className="block text-sm font-medium text-gray-700">{label}</span>
+      <span className="block text-sm font-medium text-gray-700">
+        {label}
+        {isRequired && <RequiredMark />}
+      </span>
       {children}
     </label>
   );
@@ -53,7 +57,7 @@ export function BatchFields({ value, onChange, expiryRequired, withQuantity = tr
     <div className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-3">
         {withQuantity && (
-          <Field label="Quantity">
+          <Field label="Quantity" isRequired>
             <input
               inputMode="numeric"
               value={value.quantity}
@@ -63,7 +67,7 @@ export function BatchFields({ value, onChange, expiryRequired, withQuantity = tr
             />
           </Field>
         )}
-        <Field label={expiryRequired ? "Expiry date" : "Expiry date (optional)"}>
+        <Field label={expiryRequired ? "Expiry date" : "Expiry date (optional)"} isRequired={expiryRequired}>
           <input type="date" value={value.expiryDate} onChange={(event) => onChange({ expiryDate: event.target.value })} className={inputClasses} />
         </Field>
         <Field label="Batch number (optional)">

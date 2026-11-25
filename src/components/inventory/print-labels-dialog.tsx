@@ -15,6 +15,7 @@ interface PrintLabelsDialogProps {
   product: string;
   variation: string;
   barcode: string;
+  sku: string;
   /** What the customer pays, VAT included */
   price: number | null;
   /** Suggested number of labels */
@@ -23,14 +24,14 @@ interface PrintLabelsDialogProps {
 }
 
 /** Barcode stickers of one variation. The browser prints them, or saves a PDF. */
-export function PrintLabelsDialog({ product, variation, barcode, price, suggested, onClose }: PrintLabelsDialogProps) {
+export function PrintLabelsDialog({ product, variation, barcode, sku, price, suggested, onClose }: PrintLabelsDialogProps) {
   const [paper, setPaper] = useState<Paper>(papers[0]);
   const [count, setCount] = useState(String(Math.min(Math.max(suggested, 1), MAX_LABELS)));
   const [startAt, setStartAt] = useState("1");
   const [withPrice, setWithPrice] = useState(false);
   const [error, setError] = useState("");
   const perPage = paper.columns * paper.rows;
-  const content = { product, variation, barcode, price: withPrice ? price : null };
+  const content = { product, variation, barcode, sku, price: withPrice ? price : null };
   const problem = labelProblem(barcode, paper);
   const total = Number(count);
   const skip = perPage > 1 ? Number(startAt) - 1 : 0;
@@ -48,7 +49,7 @@ export function PrintLabelsDialog({ product, variation, barcode, price, suggeste
   return (
     <>
       <FormDialog title="Print labels" submitLabel="Print" isLoading={false} error={problem || error} onSubmit={print} onClose={onClose}>
-        <Field label="Paper">
+        <Field label="Paper" isRequired>
           <select
             value={paper.id}
             onChange={(event) => setPaper(papers.find((item) => item.id === event.target.value) ?? papers[0])}
@@ -62,11 +63,11 @@ export function PrintLabelsDialog({ product, variation, barcode, price, suggeste
           </select>
         </Field>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="How many labels">
+          <Field label="How many labels" isRequired>
             <input inputMode="numeric" value={count} onChange={(event) => setCount(wholeText(event.target.value).slice(0, 3))} className={inputClasses} />
           </Field>
           {perPage > 1 && (
-            <Field label="Start at sticker (for a used sheet)">
+            <Field label="Start at sticker (for a used sheet)" isRequired>
               <input inputMode="numeric" value={startAt} onChange={(event) => setStartAt(wholeText(event.target.value).slice(0, 2))} className={inputClasses} />
             </Field>
           )}

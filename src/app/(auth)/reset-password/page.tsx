@@ -73,9 +73,9 @@ function ResetPasswordForm() {
             Get a new reset link →
           </Link>
         )}
-        <Input label="New password" type="password" autoComplete="new-password" error={errors.password?.message} {...register("password")} />
+        <Input label="New password" isRequired type="password" autoComplete="new-password" error={errors.password?.message} {...register("password")} />
         <Input
-          label="Confirm new password"
+          label="Confirm new password" isRequired
           type="password"
           autoComplete="new-password"
           error={errors.confirmPassword?.message}

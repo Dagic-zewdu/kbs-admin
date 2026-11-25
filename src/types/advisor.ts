@@ -17,11 +17,27 @@ export interface AdvisorOptions {
   feels: Option[];
   cautions: Option[];
   claims: Option[];
+  ageGroups: Option[];
+  madeFor: Option[];
+  skinTones: Option[];
+  undertones: Option[];
+  experiences: Option[];
+  bodyAreas: Option[];
+  resultsAfter: Option[];
+  weather: Option[];
+  finishes: Option[];
+  coverages: Option[];
+  scents: Option[];
 }
 
 export interface KeyIngredient {
   name: string;
   percent: number | null;
+}
+
+export interface CustomerQuestion {
+  question: string;
+  answer: string;
 }
 
 /** What the AI beauty advisor needs. Everything is optional. */
@@ -42,6 +58,21 @@ export interface AdvisorProfile {
   cautions: string[];
   summary: string | null;
   keywords: string[];
+  ageGroups: string[];
+  madeFor: string | null;
+  skinTones: string[];
+  undertones: string[];
+  experience: string | null;
+  bodyAreas: string[];
+  resultsAfter: string | null;
+  weather: string[];
+  finish: string | null;
+  coverage: string | null;
+  scent: string | null;
+  keyBenefits: string[];
+  worksWith: string[];
+  avoidWith: string[];
+  customerQuestions: CustomerQuestion[];
 }
 
 export const emptyAdvisorProfile: AdvisorProfile = {
@@ -61,6 +92,21 @@ export const emptyAdvisorProfile: AdvisorProfile = {
   cautions: [],
   summary: null,
   keywords: [],
+  ageGroups: [],
+  madeFor: null,
+  skinTones: [],
+  undertones: [],
+  experience: null,
+  bodyAreas: [],
+  resultsAfter: null,
+  weather: [],
+  finish: null,
+  coverage: null,
+  scent: null,
+  keyBenefits: [],
+  worksWith: [],
+  avoidWith: [],
+  customerQuestions: [],
 };
 
 export interface ProductIngredient {

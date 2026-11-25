@@ -6,6 +6,7 @@ export interface LabelContent {
   /** "" for a product with one version */
   variation: string;
   barcode: string;
+  sku: string;
   /** null: not printed */
   price: number | null;
 }
@@ -57,7 +58,9 @@ export function Label({ content, paper }: { content: LabelContent; paper: Paper 
           <rect key={bar.x} x={bar.x} y={0} width={bar.width} height={1} fill="#000" />
         ))}
       </svg>
-      <p style={{ fontSize: "2.8mm", lineHeight: 1.2 }}>{content.barcode}</p>
+      <p style={{ fontSize: "2.8mm", lineHeight: 1.2 }}>
+        {content.barcode} · <strong className="font-semibold">{content.sku}</strong>
+      </p>
       {content.price !== null && (
         <p className="font-semibold" style={{ fontSize: "3.6mm", lineHeight: 1.2 }}>
           {formatPrice(content.price)}

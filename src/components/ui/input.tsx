@@ -3,15 +3,18 @@
 import clsx from "clsx";
 import { Eye, EyeOff } from "lucide-react";
 import { forwardRef, useId, useState } from "react";
+import { RequiredMark } from "./required-mark";
 
 type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {
   label: string;
+  /** Shows the * */
+  isRequired?: boolean;
   error?: string;
 };
 
 /** Text input with a label and an error message underneath. */
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
-  { label, error, className, type = "text", id, ...props },
+  { label, isRequired, error, className, type = "text", id, ...props },
   ref,
 ) {
   const generatedId = useId();
@@ -23,12 +26,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
     <div className="space-y-1.5">
       <label htmlFor={inputId} className="block text-sm font-medium text-gray-700">
         {label}
+        {isRequired && <RequiredMark />}
       </label>
       <div className="relative">
         <input
           ref={ref}
           id={inputId}
           type={isPassword && showPassword ? "text" : type}
+          aria-required={isRequired}
           aria-invalid={Boolean(error)}
           aria-describedby={error ? `${inputId}-error` : undefined}
           className={clsx(

@@ -72,6 +72,7 @@ export function BrandForm({ brand }: { brand?: CompanyBrand }) {
         <div className="space-y-2">
           <Input
             label="Brand name"
+            isRequired
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="COSRX"

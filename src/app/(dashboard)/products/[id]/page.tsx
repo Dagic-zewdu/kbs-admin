@@ -1,9 +1,10 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
 import { ProductForm } from "@/components/products/product-form";
-import { ProductStatusActions } from "@/components/products/product-status-actions";
+import { ProductActions } from "@/components/products/product-actions";
 import { ProductStatusBadge } from "@/components/products/product-labels";
 import { Alert } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
@@ -13,6 +14,8 @@ import { useGetProductQuery } from "@/store/api/products.api";
 export default function ProductPage() {
   const { id } = useParams<{ id: string }>();
   const params = useSearchParams();
+  const router = useRouter();
+  const [notice, setNotice] = useState("");
   const created = params.get("created");
   const live = params.get("live");
   const { data, isFetching, isUninitialized, error } = useGetProductQuery(id, { refetchOnMountOrArgChange: true });
@@ -28,11 +31,18 @@ export default function ProductPage() {
       <PageHeader title={product.name} backHref="/products" actions={
           <span className="flex flex-wrap items-center gap-2">
             <ProductStatusBadge status={product.status} />
-            <ProductStatusActions product={product} />
+            <ProductActions
+              product={product}
+              withEdit={false}
+              onDone={setNotice}
+              onDeleted={(name) => router.replace(`/products?deleted=${encodeURIComponent(name)}`)}
+            />
           </span>
         } />
-      {live && <Alert type="success">Saved. It&apos;s live in the shop.</Alert>}
-      {created && <Alert type="success">Draft saved. You can keep adding details.</Alert>}
+      {notice && <Alert type="success">{notice}</Alert>}
+      {!notice && live && <Alert type="success">Saved. It&apos;s live on the website.</Alert>}
+      {!notice && params.get("private") && <Alert type="success">Saved. Staff can sell it.</Alert>}
+      {!notice && created && <Alert type="success">Draft saved. You can keep adding details.</Alert>}
       <ProductForm key={product.id} product={product} />
     </div>
   );

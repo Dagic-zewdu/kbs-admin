@@ -39,9 +39,9 @@ export default function LoginPage() {
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
         <Alert>{getErrorMessage(error)}</Alert>
-        <Input label="Email" type="email" autoComplete="email" error={formState.errors.email?.message} {...register("email")} />
+        <Input label="Email" isRequired type="email" autoComplete="email" error={formState.errors.email?.message} {...register("email")} />
         <Input
-          label="Password"
+          label="Password" isRequired
           type="password"
           autoComplete="current-password"
           error={formState.errors.password?.message}

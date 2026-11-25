@@ -105,6 +105,7 @@ function VatSettings({ saved, canEdit }: { saved: CompanySettings; canEdit: bool
               <div className="max-w-40">
                 <Input
                   label="VAT rate, %"
+                  isRequired
                   inputMode="decimal"
                   maxLength={5}
                   value={rateText}

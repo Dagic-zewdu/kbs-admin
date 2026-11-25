@@ -14,6 +14,7 @@ import { useListCategoriesQuery } from "@/store/api/categories.api";
 import { useListProductsQuery, type ListProductsRequest } from "@/store/api/products.api";
 import { categoryPath } from "@/types/category";
 import type { ProductStatus, ProductSummary } from "@/types/product";
+import { ProductActions } from "./product-actions";
 import { ProductStatusBadge, statusLabels } from "./product-labels";
 
 const PAGE_SIZE = 20;
@@ -39,9 +40,28 @@ const priceText = ({ priceFrom, priceTo }: ProductSummary) =>
 const variationText = ({ variationType, variationsCount }: ProductSummary) =>
   variationType === "none" ? "—" : `${variationsCount} ${variationType}${variationsCount === 1 ? "" : "s"}`;
 
+const SHOWN_CODES = 2;
+
+/** SKU and barcode of each variation */
+function Codes({ product }: { product: ProductSummary }) {
+  const more = product.codes.length - SHOWN_CODES;
+  return (
+    <span className="block space-y-1 text-xs">
+      {product.codes.slice(0, SHOWN_CODES).map((code) => (
+        <span key={code.id} className="block whitespace-nowrap">
+          <strong className="font-semibold text-gray-900">{code.sku}</strong>
+          <span className="text-gray-500"> · {code.barcode ?? "no barcode"}</span>
+        </span>
+      ))}
+      {more > 0 && <span className="block text-gray-500">+{more} more</span>}
+    </span>
+  );
+}
+
 /** The company's products in a table (cards on phones) */
 export function ProductsView() {
   const deleted = useSearchParams().get("deleted");
+  const [notice, setNotice] = useState(deleted ? `${deleted} was deleted.` : "");
   const [searchText, setSearchText] = useState("");
   const [status, setStatus] = useState<ListProductsRequest["status"]>("all");
   const [categoryId, setCategoryId] = useState("");
@@ -52,6 +72,10 @@ export function ProductsView() {
   const { data, isLoading, isFetching, error } = useListProductsQuery({ page, limit: PAGE_SIZE, search, status, categoryId, sort });
   const result = data?.data;
   const isFiltered = Boolean(search) || status !== "all" || Boolean(categoryId);
+
+  const actions = (product: ProductSummary) => (
+    <ProductActions product={product} onDone={setNotice} onDeleted={(name) => setNotice(`${name} was deleted.`)} />
+  );
 
   const createButton = (
     <Link
@@ -65,7 +89,7 @@ export function ProductsView() {
   return (
     <div className="space-y-5 sm:space-y-6">
       <PageHeader title="Products" description="Your company's products. Other companies can't see them." actions={createButton} />
-      {deleted && <Alert type="success">{deleted} was deleted.</Alert>}
+      {notice && <Alert type="success">{notice}</Alert>}
 
       <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-[1fr_9rem_14rem_9rem]">
         <label className="relative sm:col-span-3 lg:col-span-1">
@@ -144,7 +168,7 @@ export function ProductsView() {
             <ul className="divide-y divide-gray-100 md:hidden">
               {result.items.map((product) => (
                 <li key={product.id}>
-                  <Link href={`/products/${product.id}`} className="flex gap-3 px-4 py-4 active:bg-brand-50/40">
+                  <Link href={`/products/${product.id}`} className="flex gap-3 px-4 pb-2 pt-4 active:bg-brand-50/40">
                     <MainPhoto product={product} className="size-16" />
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex items-start justify-between gap-2">
@@ -157,8 +181,10 @@ export function ProductsView() {
                       <p className="text-xs text-gray-700">
                         {priceText(product)} · {product.onHand} in stock
                       </p>
+                      <Codes product={product} />
                     </div>
                   </Link>
+                  <div className="flex justify-end px-2 pb-2">{actions(product)}</div>
                 </li>
               ))}
             </ul>
@@ -168,12 +194,14 @@ export function ProductsView() {
                 <thead className="border-b border-gray-100 bg-gray-50/60 text-xs uppercase tracking-wide text-gray-500">
                   <tr>
                     <th className="px-4 py-3 font-medium">Product</th>
-                    <th className="px-4 py-3 font-medium">Category</th>
+                    <th className="px-4 py-3 font-medium">SKU · Barcode</th>
+                    <th className="hidden px-4 py-3 font-medium lg:table-cell">Category</th>
                     <th className="hidden px-4 py-3 font-medium xl:table-cell">Variations</th>
                     <th className="px-4 py-3 font-medium">Price</th>
                     <th className="px-4 py-3 font-medium">Stock</th>
                     <th className="px-4 py-3 font-medium">Status</th>
-                    <th className="hidden px-4 py-3 font-medium lg:table-cell">Added</th>
+                    <th className="hidden px-4 py-3 font-medium 2xl:table-cell">Added</th>
+                    <th className="px-4 py-3 text-right font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -188,7 +216,10 @@ export function ProductsView() {
                           </span>
                         </Link>
                       </td>
-                      <td className="max-w-56 truncate px-4 py-3 text-gray-600">{product.category?.path.join(" › ") ?? "—"}</td>
+                      <td className="px-4 py-3">
+                        <Codes product={product} />
+                      </td>
+                      <td className="hidden max-w-44 truncate lg:table-cell px-4 py-3 text-gray-600">{product.category?.path.join(" › ") ?? "—"}</td>
                       <td className="hidden whitespace-nowrap px-4 py-3 text-gray-600 xl:table-cell">{variationText(product)}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-gray-900">{priceText(product)}</td>
                       <td className={`px-4 py-3 ${product.onHand === 0 ? "text-red-700" : "text-gray-900"}`}>{product.onHand}</td>
@@ -198,7 +229,10 @@ export function ProductsView() {
                           <span className="ml-2 text-xs text-gray-500">{product.missingToGoLive.length} missing</span>
                         )}
                       </td>
-                      <td className="hidden whitespace-nowrap px-4 py-3 text-gray-600 lg:table-cell">{formatDate(product.createdAt)}</td>
+                      <td className="hidden whitespace-nowrap px-4 py-3 text-gray-600 2xl:table-cell">{formatDate(product.createdAt)}</td>
+                      <td className="px-4 py-2">
+                        <span className="flex justify-end">{actions(product)}</span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

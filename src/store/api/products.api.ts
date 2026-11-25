@@ -35,8 +35,8 @@ export const productsApi = baseApi.injectEndpoints({
       query: ({ id, ...body }) => ({ url: `/admin/products/${id}`, method: "PATCH", body }),
       invalidatesTags: (_result, _error, { id }) => ["Products", "Inventory", { type: "Product", id }],
     }),
-    /** Go live, hide (private), archive */
-    changeProductStatus: build.mutation<ApiResponse<Product>, { id: string; status: "live" | "private" | "archived" }>({
+    /** Draft, private, live or inactive */
+    changeProductStatus: build.mutation<ApiResponse<Product>, { id: string; status: ProductStatus }>({
       query: ({ id, status }) => ({ url: `/admin/products/${id}/status`, method: "PATCH", body: { status } }),
       invalidatesTags: (_result, _error, { id }) => ["Products", "Inventory", { type: "Product", id }],
     }),

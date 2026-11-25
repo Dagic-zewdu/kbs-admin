@@ -4,6 +4,7 @@ import { ScanBarcode, Tag } from "lucide-react";
 import Link from "next/link";
 import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { RequiredMark } from "@/components/ui/required-mark";
 import { getErrorMessage } from "@/lib/api-error";
 import { useCreateInternalBarcodeMutation, useGetProductByBarcodeQuery } from "@/store/api/products.api";
 import { ScannerDialog } from "./scanner-dialog";
@@ -15,10 +16,11 @@ interface BarcodeFieldProps {
   productId?: string;
   /** Big buttons, for the first step of a new product */
   prominent?: boolean;
+  isRequired?: boolean;
 }
 
 /** Scan with the camera, type, or create a code for an item without a barcode. Says when another product already has it. */
-export function BarcodeField({ value, onChange, productId, prominent }: BarcodeFieldProps) {
+export function BarcodeField({ value, onChange, productId, prominent, isRequired }: BarcodeFieldProps) {
   const inputId = useId();
   const [isScanning, setIsScanning] = useState(false);
   // Looked up after a scan or when leaving the field, not while typing
@@ -38,6 +40,7 @@ export function BarcodeField({ value, onChange, productId, prominent }: BarcodeF
     <div className="space-y-2">
       <label htmlFor={inputId} className="block text-sm font-medium text-gray-700">
         Barcode
+        {isRequired && <RequiredMark />}
       </label>
       <div className={prominent ? "grid gap-2 sm:grid-cols-[1fr_auto]" : "flex flex-wrap gap-2"}>
         <input
@@ -51,6 +54,7 @@ export function BarcodeField({ value, onChange, productId, prominent }: BarcodeF
               setChecked(typed);
             }
           }}
+          aria-required={isRequired}
           placeholder="Scan or type it"
           maxLength={40}
           autoComplete="off"

@@ -152,6 +152,7 @@ export function VariationStockView({ id }: { id: string }) {
           product={product.name}
           variation={variation.name}
           barcode={variation.barcode}
+          sku={variation.sku}
           price={settings ? customerPrice(variation.price, settings) : null}
           suggested={stock.onHand}
           onClose={close}

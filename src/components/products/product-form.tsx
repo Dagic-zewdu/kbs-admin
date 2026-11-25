@@ -12,6 +12,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
+import { RequiredMark } from "@/components/ui/required-mark";
 import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage } from "@/lib/api-error";
 import { formatPrice } from "@/lib/labels";
@@ -32,6 +33,7 @@ import { emptyAdvisorProfile } from "@/types/advisor";
 import { AdvisorSection } from "./advisor-section";
 import { IngredientsSection } from "./ingredients-section";
 import { PhotoManager } from "./photo-manager";
+import { PhraseList } from "./phrase-list";
 import { missingLabels } from "./product-labels";
 import { emptyVariation, VariationEditor, type VariationRow } from "./variation-editor";
 
@@ -89,11 +91,15 @@ const stepOfMissing: Record<string, StepId> = {
   category: "basics",
   barcode: "variations",
   photo: "photos",
+  cost: "variations",
   price: "variations",
   stock: "variations",
   shortDescription: "description",
   description: "description",
 };
+
+/** Enough for staff to sell it (private) */
+const neededToSell = ["brand", "category", "barcode", "cost", "price"];
 
 /** What is missing to go live, from what is typed now */
 const missingNow = (form: FormState) => {
@@ -102,6 +108,7 @@ const missingNow = (form: FormState) => {
   if (!form.category) missing.push("category");
   if (!form.photos.length) missing.push("photo");
   if (form.variations.some((row) => !row.barcode.trim())) missing.push("barcode");
+  if (form.variations.some((row) => row.costPrice.trim() === "")) missing.push("cost");
   if (form.variations.some((row) => !(Number(row.price) > 0))) missing.push("price");
   if (!form.variations.some((row) => row.stock?.batches || Number(row.newBatch.quantity) > 0)) missing.push("stock");
   if (!form.shortDescription.trim()) missing.push("shortDescription");
@@ -120,11 +127,26 @@ function ReviewProfit({ price, cost }: { price: number | null; cost: number | nu
 }
 
 /** Hidden steps stay mounted, so nothing typed is lost */
-function Section({ title, description, shown, children }: { title: string; description: string; shown: boolean; children: React.ReactNode }) {
+function Section({
+  title,
+  isRequired,
+  description,
+  shown,
+  children,
+}: {
+  title: string;
+  isRequired?: boolean;
+  description: string;
+  shown: boolean;
+  children: React.ReactNode;
+}) {
   return (
     <section hidden={!shown} className="space-y-4 rounded-xl border border-gray-200 bg-white p-4 sm:p-6">
       <div>
-        <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+        <h2 className="text-base font-semibold text-gray-900">
+          {title}
+          {isRequired && <RequiredMark />}
+        </h2>
         <p className="mt-0.5 text-sm text-gray-500">{description}</p>
       </div>
       {children}
@@ -173,6 +195,7 @@ export function ProductForm({ product }: { product?: Product }) {
     return () => window.removeEventListener("beforeunload", warn);
   }, [isDirty]);
 
+  const changeAdvisor = (values: Partial<FormState["advisor"]>) => change({ advisor: { ...form.advisor, ...values } });
   const expiryRequired = form.category?.expiryRequired ?? true;
 
   /** What is wrong before anything is sent, and the step to fix it */
@@ -186,17 +209,17 @@ export function ProductForm({ product }: { product?: Product }) {
         return { step: "variations", message: "The old selling price must be higher than the selling price." };
       }
       const { quantity, ...details } = row.newBatch;
-      if (!row.stock?.batches && !Number(quantity) && Object.values(details).some(Boolean)) {
-        return { step: "variations", message: "Enter the quantity of the first stock." };
+      if (!Number(quantity) && Object.values(details).some(Boolean)) {
+        return { step: "variations", message: "Enter the quantity of the new stock." };
       }
-      if (!row.stock?.batches && Number(quantity) > 0 && expiryRequired && !details.expiryDate) {
-        return { step: "variations", message: "Enter the expiry date of the first stock." };
+      if (Number(quantity) > 0 && expiryRequired && !details.expiryDate) {
+        return { step: "variations", message: "Enter the expiry date of the new stock." };
       }
     }
     return null;
   };
 
-  const save = async (thenLive: boolean) => {
+  const save = async (then?: "live" | "private") => {
     setNotice("");
     createState.reset();
     updateState.reset();
@@ -221,7 +244,11 @@ export function ProductForm({ product }: { product?: Product }) {
       claims: form.claims,
       monthsAfterOpening: form.monthsAfterOpening ? Number(form.monthsAfterOpening) : null,
       ingredientsText: form.ingredientsText,
-      advisor: { ...form.advisor, keyIngredients: form.advisor.keyIngredients.filter((item) => item.name.trim()) },
+      advisor: {
+        ...form.advisor,
+        keyIngredients: form.advisor.keyIngredients.filter((item) => item.name.trim()),
+        customerQuestions: form.advisor.customerQuestions.filter((item) => item.question.trim() || item.answer.trim()),
+      },
       attributes: form.attributes,
       variationType: form.variationType,
       variations: form.variations.map((row) => ({
@@ -236,10 +263,15 @@ export function ProductForm({ product }: { product?: Product }) {
         price: toNumber(row.price),
         compareAtPrice: toNumber(row.compareAtPrice),
         lowStockLevel: Number(row.lowStockLevel || 0),
-        newBatch: !row.stock?.batches && Number(row.newBatch.quantity) > 0 ? toReceiveBatch(row.newBatch) : undefined,
+        newBatch: Number(row.newBatch.quantity) > 0 ? toReceiveBatch(row.newBatch) : undefined,
       })),
       photoFileIds: form.photos.map((photo) => photo.fileId),
     };
+
+    if (body.advisor.customerQuestions.some((item) => item.question.trim().length < 3 || item.answer.trim().length < 2)) {
+      setLocalError("Every customer question needs a question and an answer.");
+      return goTo("advisor");
+    }
 
     const saved = product ? await update({ id: product.id, ...body }) : await create(body);
     // The result is shown at the top
@@ -250,10 +282,10 @@ export function ProductForm({ product }: { product?: Product }) {
     setForm(toForm(saved.data.data));
     setIsDirty(false);
 
-    const live = thenLive ? await changeStatus({ id, status: "live" }) : undefined;
-    if (!product) return router.replace(`/products/${id}?${live?.data ? "live" : "created"}=1`);
-    if (thenLive && !live?.data) return;
-    setNotice(thenLive ? "Saved. It's live in the shop." : "Saved.");
+    const changed = then ? await changeStatus({ id, status: then }) : undefined;
+    if (!product) return router.replace(`/products/${id}?${changed?.data ? then : "created"}=1`);
+    if (then && !changed?.data) return;
+    setNotice(then === "live" ? "Saved. It's live on the website." : then === "private" ? "Saved. Staff can sell it." : "Saved.");
   };
 
   // The brand fills in its country, unless staff typed another one
@@ -282,7 +314,7 @@ export function ProductForm({ product }: { product?: Product }) {
         noValidate
         onSubmit={(event) => {
           event.preventDefault();
-          save(false);
+          save();
         }}
         className="space-y-5"
       >
@@ -309,6 +341,9 @@ export function ProductForm({ product }: { product?: Product }) {
           </ol>
         </nav>
 
+        <p className="text-xs text-gray-500">
+          <span className="text-red-600">*</span> Required before it can be sold or go live. A draft needs only its name.
+        </p>
         {(localError || error) && <Alert>{localError || getErrorMessage(error)}</Alert>}
         {notice && <Alert type="success">{notice}</Alert>}
 
@@ -316,18 +351,19 @@ export function ProductForm({ product }: { product?: Product }) {
           {form.variationType === "none" && (
             <BarcodeField
               prominent
+              isRequired
               value={firstRow.barcode}
               productId={product?.id}
               onChange={(barcode) => change({ variations: [{ ...firstRow, barcode }] })}
             />
           )}
-          <Input label="Product name" placeholder="Low pH Good Morning Gel Cleanser" maxLength={200} {...field("name")} />
+          <Input label="Product name" isRequired placeholder="Low pH Good Morning Gel Cleanser" maxLength={200} {...field("name")} />
           <div className="grid gap-4 md:grid-cols-2">
-            <BrandSelect label="Brand" value={form.brand} onChange={chooseBrand} />
-            <CategorySelect label="Category" value={form.category} onChange={chooseCategory} />
+            <BrandSelect label="Brand" isRequired value={form.brand} onChange={chooseBrand} />
+            <CategorySelect label="Category" isRequired value={form.category} onChange={chooseCategory} />
           </div>
           <div className="grid gap-4 md:grid-cols-2">
-            <Input label="Country of origin (filled in from the brand)" placeholder="South Korea" maxLength={100} {...field("countryOfOrigin")} />
+            <Input label="Country of origin (from the brand)" placeholder="South Korea" maxLength={100} {...field("countryOfOrigin")} />
             <Input label="EFDA number (optional)" maxLength={100} {...field("efdaNumber")} />
           </div>
           {form.category && (
@@ -335,7 +371,7 @@ export function ProductForm({ product }: { product?: Product }) {
           )}
         </Section>
 
-        <Section shown={step === "photos"} title="Photos" description="Front, back and texture. The first photo is the main one.">
+        <Section shown={step === "photos"} title="Photos" isRequired description="Front, back and texture. The first photo is the main one.">
           <PhotoManager
             photos={form.photos}
             onChange={(updatePhotos) => {
@@ -358,8 +394,17 @@ export function ProductForm({ product }: { product?: Product }) {
         </Section>
 
         <Section shown={step === "description"} title="Description" description="What the customer reads.">
-          <Textarea label="Short description" rows={2} placeholder="One or two lines for the product card" maxLength={300} {...field("shortDescription")} />
-          <Textarea label="Full description" rows={6} maxLength={10000} {...field("description")} />
+          <Textarea label="Short description" isRequired rows={2} placeholder="One or two lines for the product card" maxLength={300} {...field("shortDescription")} />
+          <Textarea label="Full description" isRequired rows={6} maxLength={10000} {...field("description")} />
+          <PhraseList
+            label="Key benefits (optional)"
+            hint="One short sentence each, then Enter. Also for the AI"
+            placeholder="Cleans without drying the skin"
+            value={form.advisor.keyBenefits}
+            onChange={(keyBenefits) => changeAdvisor({ keyBenefits })}
+            max={6}
+            maxLength={150}
+          />
           <Textarea label="How to use (optional)" rows={3} maxLength={3000} {...field("howToUse")} />
           <Textarea label="Warnings (optional)" rows={2} placeholder="For external use only" maxLength={2000} {...field("warnings")} />
         </Section>
@@ -372,6 +417,9 @@ export function ProductForm({ product }: { product?: Product }) {
                 text={form.ingredientsText}
                 claims={form.claims}
                 monthsAfterOpening={form.monthsAfterOpening}
+                worksWith={form.advisor.worksWith}
+                avoidWith={form.advisor.avoidWith}
+                onAdvisorChange={changeAdvisor}
                 onChange={change}
               />
             </Section>
@@ -382,7 +430,7 @@ export function ProductForm({ product }: { product?: Product }) {
                 options={advisorOptions}
                 value={form.advisor}
                 hasIngredients={Boolean(form.ingredientsText.trim())}
-                onChange={(advisor) => change({ advisor: { ...form.advisor, ...advisor } })}
+                onChange={changeAdvisor}
               />
             </Section>
           </>
@@ -413,7 +461,7 @@ export function ProductForm({ product }: { product?: Product }) {
                 <span className="text-right text-gray-900">
                   {formatPrice(toNumber(row.price))}
                   <ReviewProfit price={toNumber(row.price)} cost={toNumber(row.costPrice)} />
-                  <span className="block text-gray-500">{row.stock?.batches ? row.stock.onHand : Number(row.newBatch.quantity || 0)} in stock</span>
+                  <span className="block text-gray-500">{(row.stock?.onHand ?? 0) + Number(row.newBatch.quantity || 0)} in stock</span>
                 </span>
               </li>
             ))}
@@ -436,12 +484,17 @@ export function ProductForm({ product }: { product?: Product }) {
           ) : (
             <p className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
               <Check className="size-4 shrink-0" aria-hidden />
-              {canGoLive ? "Everything is there. It can go live." : "It's live in the shop."}
+              {canGoLive ? "Everything is there. It can go live." : "It's live on the website."}
             </p>
           )}
-          {canGoLive && product?.status !== "archived" && (
-            <Button type="button" onClick={() => save(true)} disabled={missing.length > 0 || isUploading} isLoading={isSaving} className="w-full sm:w-auto">
+          {canGoLive && product?.status !== "inactive" && (
+            <Button type="button" onClick={() => save("live")} disabled={missing.length > 0 || isUploading} isLoading={isSaving} className="w-full sm:w-auto">
               Save and go live
+            </Button>
+          )}
+          {(!product || product.status === "draft") && missing.length > 0 && !missing.some((item) => neededToSell.includes(item)) && (
+            <Button type="button" variant="secondary" onClick={() => save("private")} disabled={isUploading} isLoading={isSaving} className="w-full sm:w-auto">
+              Save as private (staff can sell it)
             </Button>
           )}
         </Section>

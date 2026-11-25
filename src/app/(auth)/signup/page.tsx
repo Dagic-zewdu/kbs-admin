@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { RequiredMark } from "@/components/ui/required-mark";
 import { Input } from "@/components/ui/input";
 import { getErrorMessage } from "@/lib/api-error";
 import { getRememberedCompany } from "@/lib/brand-theme";
@@ -60,6 +61,7 @@ export default function SignupPage() {
         <div className="space-y-1.5">
           <label htmlFor="companySlug" className="block text-sm font-medium text-gray-700">
             Company
+            <RequiredMark />
           </label>
           <select
             id="companySlug"
@@ -83,13 +85,13 @@ export default function SignupPage() {
           {errors.companySlug && <p className="text-xs text-red-600">{errors.companySlug.message}</p>}
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Input label="First name" autoComplete="given-name" error={errors.firstName?.message} {...register("firstName")} />
-          <Input label="Last name" autoComplete="family-name" error={errors.lastName?.message} {...register("lastName")} />
+          <Input label="First name" isRequired autoComplete="given-name" error={errors.firstName?.message} {...register("firstName")} />
+          <Input label="Last name (optional)" autoComplete="family-name" error={errors.lastName?.message} {...register("lastName")} />
         </div>
-        <Input label="Email" type="email" autoComplete="email" error={errors.email?.message} {...register("email")} />
-        <Input label="Password" type="password" autoComplete="new-password" error={errors.password?.message} {...register("password")} />
+        <Input label="Email" isRequired type="email" autoComplete="email" error={errors.email?.message} {...register("email")} />
+        <Input label="Password" isRequired type="password" autoComplete="new-password" error={errors.password?.message} {...register("password")} />
         <Input
-          label="Confirm password"
+          label="Confirm password" isRequired
           type="password"
           autoComplete="new-password"
           error={errors.confirmPassword?.message}
