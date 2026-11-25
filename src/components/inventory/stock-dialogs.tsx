@@ -3,17 +3,24 @@
 import { useState } from "react";
 import { getErrorMessage } from "@/lib/api-error";
 import { wholeText } from "@/lib/numbers";
-import { useAdjustBatchMutation, useReceiveBatchMutation, useUpdateBatchMutation } from "@/store/api/inventory.api";
-import type { AdjustBatch, Batch } from "@/types/inventory";
+import { useAdjustBatchMutation, useReceiveBatchMutation, useReduceStockMutation, useUpdateBatchMutation } from "@/store/api/inventory.api";
+import type { AdjustBatch, Batch, ReduceStock, VariationStock } from "@/types/inventory";
 import { BatchFields, emptyBatch, Field, toBatchDetails, toReceiveBatch, type BatchForm } from "./batch-fields";
 import { FormDialog } from "./form-dialog";
 
 interface DoneProps {
   onClose: () => void;
-  onDone: (message: string) => void;
+  onDone: (message: string, stock: VariationStock) => void;
 }
 
-export function ReceiveDialog({ variationId, expiryRequired, onClose, onDone }: DoneProps & { variationId: string; expiryRequired: boolean }) {
+interface ReceiveDialogProps extends DoneProps {
+  variationId: string;
+  expiryRequired: boolean;
+  title?: string;
+  submitLabel?: string;
+}
+
+export function ReceiveDialog({ variationId, expiryRequired, title = "Receive stock", submitLabel = "Receive", onClose, onDone }: ReceiveDialogProps) {
   const [form, setForm] = useState<BatchForm>(emptyBatch);
   const [localError, setLocalError] = useState("");
   const [receive, { isLoading, error }] = useReceiveBatchMutation();
@@ -23,13 +30,13 @@ export function ReceiveDialog({ variationId, expiryRequired, onClose, onDone }: 
     if (expiryRequired && !form.expiryDate) return setLocalError("Enter the expiry date from the package.");
     setLocalError("");
     const result = await receive({ variationId, ...toReceiveBatch(form) });
-    if (result.data) onDone(`${form.quantity} units were received.`);
+    if (result.data) onDone(`${form.quantity} units were received.`, result.data.data.stock);
   };
 
   return (
     <FormDialog
-      title="Receive stock"
-      submitLabel="Receive"
+      title={title}
+      submitLabel={submitLabel}
       isLoading={isLoading}
       error={localError || getErrorMessage(error)}
       onSubmit={submit}
@@ -53,12 +60,66 @@ export function EditBatchDialog({ batch, expiryRequired, onClose, onDone }: Done
 
   const submit = async () => {
     const result = await update({ id: batch.id, ...toBatchDetails(form) });
-    if (result.data) onDone("The batch was saved.");
+    if (result.data) onDone("The batch was saved.", result.data.data.stock);
   };
 
   return (
     <FormDialog title="Correct the batch" submitLabel="Save" isLoading={isLoading} error={getErrorMessage(error)} onSubmit={submit} onClose={onClose}>
       <BatchFields value={form} onChange={(change) => setForm({ ...form, ...change })} expiryRequired={expiryRequired} withQuantity={false} />
+    </FormDialog>
+  );
+}
+
+const reasons: { type: ReduceStock["type"]; label: string }[] = [
+  { type: "damaged", label: "Damaged or lost" },
+  { type: "corrected", label: "Wrong count: there are fewer" },
+];
+
+/** Fewer units, without choosing a batch */
+export function ReduceDialog({ variationId, onHand, onClose, onDone }: DoneProps & { variationId: string; onHand: number }) {
+  const [type, setType] = useState<ReduceStock["type"]>("damaged");
+  const [quantity, setQuantity] = useState("");
+  const [reason, setReason] = useState("");
+  const [localError, setLocalError] = useState("");
+  const [reduce, { isLoading, error }] = useReduceStockMutation();
+  const units = Number(quantity);
+  const inputClasses =
+    "h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 sm:h-10";
+
+  const submit = async () => {
+    if (!(units > 0)) return setLocalError("Enter how many units to take away.");
+    if (units > onHand) return setLocalError(`Only ${onHand} units are in stock.`);
+    if (type === "corrected" && reason.trim().length < 3) return setLocalError("Say why it's corrected.");
+    setLocalError("");
+    const result = await reduce({ variationId, type, quantity: units, reason: reason.trim() });
+    if (result.data) onDone(`${units} units were taken away.`, result.data.data.stock);
+  };
+
+  return (
+    <FormDialog title="Decrease quantity" submitLabel="Decrease" isLoading={isLoading} error={localError || getErrorMessage(error)} onSubmit={submit} onClose={onClose}>
+      <p className="text-sm text-gray-600">{onHand} in stock. The units that expire first are taken away.</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="How many to take away" isRequired>
+          <input inputMode="numeric" value={quantity} onChange={(event) => setQuantity(wholeText(event.target.value).slice(0, 7))} className={inputClasses} />
+        </Field>
+        <Field label="Why" isRequired>
+          <select value={type} onChange={(event) => setType(event.target.value as ReduceStock["type"])} className={inputClasses}>
+            {reasons.map((item) => (
+              <option key={item.type} value={item.type}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+      <Field label={type === "corrected" ? "Note" : "Note (optional)"} isRequired={type === "corrected"}>
+        <input value={reason} maxLength={300} onChange={(event) => setReason(event.target.value)} className={inputClasses} />
+      </Field>
+      {units > 0 && units <= onHand && (
+        <p className="text-sm text-gray-700">
+          After this: <strong className="font-semibold">{onHand - units}</strong> in stock
+        </p>
+      )}
     </FormDialog>
   );
 }
@@ -84,7 +145,7 @@ export function AdjustDialog({ batch, onClose, onDone }: DoneProps & { batch: Ba
     if (type === "corrected" && reason.trim().length < 3) return setLocalError("Say why it's corrected.");
     setLocalError("");
     const result = await adjust({ id: batch.id, type, quantity: Number(quantity), reason: reason.trim() });
-    if (result.data) onDone("The stock was changed.");
+    if (result.data) onDone("The stock was changed.", result.data.data.stock);
   };
 
   return (

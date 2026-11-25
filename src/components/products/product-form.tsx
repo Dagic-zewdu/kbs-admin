@@ -395,6 +395,10 @@ export function ProductForm({ product }: { product?: Product }) {
             productId={product?.id}
             expiryRequired={expiryRequired}
             onChange={(variationType, variations) => change({ variationType, variations })}
+            onStockChange={(id, stock) =>
+              // Already saved, so nothing becomes unsaved
+              setForm((current) => ({ ...current, variations: current.variations.map((row) => (row.id === id ? { ...row, stock } : row)) }))
+            }
           />
         </Section>
 

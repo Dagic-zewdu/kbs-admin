@@ -1,11 +1,12 @@
 "use client";
 
-import { Boxes, Plus, Trash2 } from "lucide-react";
+import { Boxes, Minus, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { BarcodeField } from "@/components/barcode/barcode-field";
 import { BatchFields, emptyBatch, Field, type BatchForm } from "@/components/inventory/batch-fields";
 import { RequiredMark } from "@/components/ui/required-mark";
+import { ReceiveDialog, ReduceDialog } from "@/components/inventory/stock-dialogs";
 import { Button } from "@/components/ui/button";
 import { PriceSummary } from "./price-summary";
 import { formatDay } from "@/lib/labels";
@@ -73,11 +74,13 @@ interface VariationEditorProps {
   type: VariationType;
   rows: VariationRow[];
   onChange: (type: VariationType, rows: VariationRow[]) => void;
+  /** The stock was changed and saved */
+  onStockChange: (id: string, stock: VariationStock) => void;
   productId?: string;
   expiryRequired: boolean;
 }
 
-export function VariationEditor({ type, rows, onChange, productId, expiryRequired }: VariationEditorProps) {
+export function VariationEditor({ type, rows, onChange, onStockChange, productId, expiryRequired }: VariationEditorProps) {
   const changeType = (next: VariationType) => {
     // No options = exactly one row
     const kept = next === "none" ? rows.slice(0, 1) : rows;
@@ -144,6 +147,7 @@ export function VariationEditor({ type, rows, onChange, productId, expiryRequire
               type={type}
               row={row}
               onChange={(change) => changeRow(row.key, change)}
+              onStockChange={(stock) => row.id && onStockChange(row.id, stock)}
               productId={productId}
               expiryRequired={expiryRequired}
             />
@@ -164,11 +168,12 @@ interface VariationFieldsProps {
   type: VariationType;
   row: VariationRow;
   onChange: (change: Partial<VariationRow>) => void;
+  onStockChange: (stock: VariationStock) => void;
   productId?: string;
   expiryRequired: boolean;
 }
 
-function VariationFields({ type, row, onChange, productId, expiryRequired }: VariationFieldsProps) {
+function VariationFields({ type, row, onChange, onStockChange, productId, expiryRequired }: VariationFieldsProps) {
   const nameField = nameLabels[type];
   const settings = useGetSettingsQuery().data?.data;
   return (
@@ -278,65 +283,70 @@ function VariationFields({ type, row, onChange, productId, expiryRequired }: Var
         </Field>
       </div>
 
-      {/* Closed again once the added stock is saved */}
-      <Quantity key={row.stock?.batches ?? 0} row={row} onChange={onChange} expiryRequired={expiryRequired} />
+      <Quantity row={row} onChange={onChange} onStockChange={onStockChange} expiryRequired={expiryRequired} />
     </>
   );
 }
 
-/** How many there are of this variation, and adding more */
-function Quantity({ row, onChange, expiryRequired }: Pick<VariationFieldsProps, "row" | "onChange" | "expiryRequired">) {
-  const hasStock = Boolean(row.stock?.batches);
-  const [isAdding, setIsAdding] = useState(!hasStock || Boolean(row.newBatch.quantity));
+/** How many there are of this variation. Once saved, it is increased and decreased right away, whatever else is being edited. */
+function Quantity({ row, onChange, onStockChange, expiryRequired }: Pick<VariationFieldsProps, "row" | "onChange" | "onStockChange" | "expiryRequired">) {
+  const [dialog, setDialog] = useState<"increase" | "decrease" | null>(null);
+  const [notice, setNotice] = useState("");
+  const stock = row.stock;
+  const close = () => setDialog(null);
+  const done = (message: string, changed: VariationStock) => {
+    setDialog(null);
+    setNotice(message);
+    onStockChange(changed);
+  };
 
   return (
     <fieldset className="space-y-3 rounded-lg bg-gray-50 p-3 sm:p-4">
       <legend className="sr-only">Quantity in stock</legend>
-      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-        <p className="text-gray-700">
-          <span className="font-semibold text-gray-900">Quantity in stock{hasStock && `: ${row.stock?.onHand}`}</span>
-          {row.stock?.nextExpiry && <> · expires {formatDay(row.stock.nextExpiry)}</>}
-          {Boolean(row.stock?.expired) && <span className="text-red-700"> · {row.stock?.expired} expired</span>}
-        </p>
-        {hasStock && (
-          <span className="flex flex-wrap gap-x-4">
-            {!isAdding && (
-              <button
-                type="button"
-                onClick={() => setIsAdding(true)}
-                className="inline-flex min-h-9 items-center gap-1.5 font-medium text-brand-700 hover:underline"
-              >
-                <Plus className="size-4" aria-hidden /> Add quantity
-              </button>
-            )}
-            <Link href={`/inventory/${row.id}`} className="inline-flex min-h-9 items-center gap-1.5 font-medium text-brand-700 hover:underline">
-              <Boxes className="size-4" aria-hidden /> Manage stock
-            </Link>
-          </span>
-        )}
-      </div>
-      {isAdding && (
+      {row.id && stock?.batches ? (
         <>
-          <BatchFields value={row.newBatch} expiryRequired={expiryRequired} onChange={(change) => onChange({ newBatch: { ...row.newBatch, ...change } })} />
-          {hasStock && (
-            <div className="flex flex-wrap items-center gap-3 text-sm">
-              {Number(row.newBatch.quantity) > 0 && (
-                <span className="text-gray-700">
-                  After saving: <strong className="font-semibold">{(row.stock?.onHand ?? 0) + Number(row.newBatch.quantity)}</strong>
-                </span>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  onChange({ newBatch: emptyBatch });
-                  setIsAdding(false);
-                }}
-                className="min-h-9 font-medium text-gray-600 hover:underline"
-              >
-                Cancel
-              </button>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="text-sm">
+              <p className="font-semibold text-gray-900">Quantity in stock</p>
+              <p className="text-gray-600">
+                {stock.nextExpiry ? `Next expiry ${formatDay(stock.nextExpiry)}` : stock.onHand ? "Doesn't expire" : "Out of stock"}
+                {stock.expired > 0 && <span className="text-red-700"> · {stock.expired} expired</span>}
+              </p>
             </div>
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="secondary" onClick={() => setDialog("decrease")} disabled={stock.onHand === 0}>
+                <Minus className="size-4" aria-hidden /> Decrease
+              </Button>
+              <output className={`min-w-12 text-center text-lg font-semibold ${stock.onHand ? "text-gray-900" : "text-red-700"}`}>{stock.onHand}</output>
+              <Button type="button" variant="secondary" onClick={() => setDialog("increase")}>
+                <Plus className="size-4" aria-hidden /> Increase
+              </Button>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+            <span role="status" className="text-emerald-700">
+              {notice}
+            </span>
+            <Link href={`/inventory/${row.id}`} className="inline-flex min-h-9 items-center gap-1.5 font-medium text-brand-700 hover:underline">
+              <Boxes className="size-4" aria-hidden /> Batches and history
+            </Link>
+          </div>
+          {dialog === "increase" && (
+            <ReceiveDialog
+              variationId={row.id}
+              expiryRequired={expiryRequired}
+              title="Increase quantity"
+              submitLabel="Increase"
+              onClose={close}
+              onDone={done}
+            />
           )}
+          {dialog === "decrease" && <ReduceDialog variationId={row.id} onHand={stock.onHand} onClose={close} onDone={done} />}
+        </>
+      ) : (
+        <>
+          <p className="text-sm font-semibold text-gray-900">Quantity in stock</p>
+          <BatchFields value={row.newBatch} expiryRequired={expiryRequired} onChange={(change) => onChange({ newBatch: { ...row.newBatch, ...change } })} />
         </>
       )}
     </fieldset>

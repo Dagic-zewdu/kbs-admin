@@ -64,6 +64,12 @@ export interface BatchDetails {
   supplier: string | null;
 }
 
+export interface ReduceStock {
+  type: "damaged" | "corrected";
+  quantity: number;
+  reason: string;
+}
+
 export type ReceiveBatch = BatchDetails & { quantity: number };
 export interface AdjustBatch {
   type: "damaged" | "returned" | "corrected";

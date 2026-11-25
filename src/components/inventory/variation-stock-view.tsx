@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { ArrowDownUp, Loader2, Pencil, Plus, Printer } from "lucide-react";
+import { ArrowDownUp, Loader2, Pencil, Minus, Plus, Printer } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { Alert } from "@/components/ui/alert";
@@ -15,7 +15,7 @@ import { useGetSettingsQuery } from "@/store/api/settings.api";
 import { useGetVariationStockQuery } from "@/store/api/inventory.api";
 import type { Batch, StockMovement } from "@/types/inventory";
 import { PrintLabelsDialog } from "./print-labels-dialog";
-import { AdjustDialog, EditBatchDialog, ReceiveDialog } from "./stock-dialogs";
+import { AdjustDialog, EditBatchDialog, ReceiveDialog, ReduceDialog } from "./stock-dialogs";
 
 const movementLabels: Record<StockMovement["type"], string> = {
   received: "Received",
@@ -25,7 +25,7 @@ const movementLabels: Record<StockMovement["type"], string> = {
   corrected: "Counted again",
 };
 
-type OpenDialog = { type: "receive" | "labels" } | { type: "edit" | "adjust"; batch: Batch } | null;
+type OpenDialog = { type: "receive" | "reduce" | "labels" } | { type: "edit" | "adjust"; batch: Batch } | null;
 
 /** One variation: its batches and what happened to its stock */
 export function VariationStockView({ id }: { id: string }) {
@@ -57,8 +57,11 @@ export function VariationStockView({ id }: { id: string }) {
                 <Printer className="size-4" aria-hidden /> Print labels
               </Button>
             )}
+            <Button type="button" variant="secondary" onClick={() => setDialog({ type: "reduce" })} disabled={stock.onHand === 0}>
+              <Minus className="size-4" aria-hidden /> Decrease
+            </Button>
             <Button type="button" onClick={() => setDialog({ type: "receive" })}>
-              <Plus className="size-4" aria-hidden /> Receive stock
+              <Plus className="size-4" aria-hidden /> Increase
             </Button>
           </>
         }
@@ -158,6 +161,7 @@ export function VariationStockView({ id }: { id: string }) {
           onClose={close}
         />
       )}
+      {dialog?.type === "reduce" && <ReduceDialog variationId={id} onHand={stock.onHand} onClose={close} onDone={done} />}
       {dialog?.type === "edit" && <EditBatchDialog batch={dialog.batch} expiryRequired={expiryRequired} onClose={close} onDone={done} />}
       {dialog?.type === "adjust" && <AdjustDialog batch={dialog.batch} onClose={close} onDone={done} />}
     </div>

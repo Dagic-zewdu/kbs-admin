@@ -1,5 +1,5 @@
 import type { ApiResponse, PaginatedResult } from "@/types/auth";
-import type { AdjustBatch, BatchDetails, InventoryFilter, InventoryItem, ReceiveBatch, VariationStockDetail } from "@/types/inventory";
+import type { AdjustBatch, BatchDetails, InventoryFilter, InventoryItem, ReceiveBatch, ReduceStock, VariationStockDetail } from "@/types/inventory";
 import { baseApi } from "./base-api";
 
 type InventoryPage = PaginatedResult<InventoryItem> & { counts: Record<InventoryFilter, number> };
@@ -19,6 +19,11 @@ export const inventoryApi = baseApi.injectEndpoints({
       query: ({ variationId, ...body }) => ({ url: `/admin/inventory/variations/${variationId}/batches`, method: "POST", body }),
       invalidatesTags: ["Inventory", "Products", "Product"],
     }),
+    /** Takes the units that expire first */
+    reduceStock: build.mutation<ApiResponse<VariationStockDetail>, ReduceStock & { variationId: string }>({
+      query: ({ variationId, ...body }) => ({ url: `/admin/inventory/variations/${variationId}/reduce`, method: "POST", body }),
+      invalidatesTags: ["Inventory", "Products", "Product"],
+    }),
     updateBatch: build.mutation<ApiResponse<VariationStockDetail>, BatchDetails & { id: string }>({
       query: ({ id, ...body }) => ({ url: `/admin/inventory/batches/${id}`, method: "PATCH", body }),
       invalidatesTags: ["Inventory", "Products", "Product"],
@@ -30,4 +35,4 @@ export const inventoryApi = baseApi.injectEndpoints({
   }),
 });
 
-export const { useListInventoryQuery, useGetVariationStockQuery, useReceiveBatchMutation, useUpdateBatchMutation, useAdjustBatchMutation } = inventoryApi;
+export const { useListInventoryQuery, useGetVariationStockQuery, useReceiveBatchMutation, useReduceStockMutation, useUpdateBatchMutation, useAdjustBatchMutation } = inventoryApi;

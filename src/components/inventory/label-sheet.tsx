@@ -59,7 +59,8 @@ export function Label({ content, paper }: { content: LabelContent; paper: Paper 
         ))}
       </svg>
       <p style={{ fontSize: "2.8mm", lineHeight: 1.2 }}>
-        {content.barcode} · <strong className="font-semibold">{content.sku}</strong>
+        {content.barcode !== content.sku && `${content.barcode} · `}
+        <strong className="font-semibold">{content.sku}</strong>
       </p>
       {content.price !== null && (
         <p className="font-semibold" style={{ fontSize: "3.6mm", lineHeight: 1.2 }}>

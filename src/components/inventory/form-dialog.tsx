@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 
@@ -14,7 +15,7 @@ interface FormDialogProps {
   children: React.ReactNode;
 }
 
-/** A form in a modal. Mount it only while it's open. */
+/** A form in a modal, in the page's body so it can be opened from inside another form. Mount it only while it's open. */
 export function FormDialog({ title, submitLabel, isLoading, error, onSubmit, onClose, children }: FormDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -27,7 +28,7 @@ export function FormDialog({ title, submitLabel, isLoading, error, onSubmit, onC
     if (!isLoading) onClose();
   };
 
-  return (
+  return createPortal(
     <dialog
       ref={dialogRef}
       aria-labelledby={titleId}
@@ -44,6 +45,7 @@ export function FormDialog({ title, submitLabel, isLoading, error, onSubmit, onC
         noValidate
         onSubmit={(event) => {
           event.preventDefault();
+          event.stopPropagation(); // React passes it on to the form that opened this one
           onSubmit();
         }}
         className="space-y-4 p-5 sm:p-6"
@@ -62,6 +64,7 @@ export function FormDialog({ title, submitLabel, isLoading, error, onSubmit, onC
           </Button>
         </div>
       </form>
-    </dialog>
+    </dialog>,
+    document.body,
   );
 }
