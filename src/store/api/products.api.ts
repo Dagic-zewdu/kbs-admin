@@ -1,4 +1,5 @@
 import type { ApiResponse, PaginatedResult } from "@/types/auth";
+import type { AdvisorOptions, IngredientAnalysis, ProductIngredient } from "@/types/advisor";
 import type { UploadedFile } from "@/types/file";
 import type { CategoryField, Product, ProductStatus, ProductSummary, SaveProductRequest } from "@/types/product";
 import { baseApi } from "./base-api";
@@ -38,6 +39,17 @@ export const productsApi = baseApi.injectEndpoints({
       query: (id) => ({ url: `/admin/products/${id}`, method: "DELETE" }),
       invalidatesTags: ["Products"],
     }),
+    getAdvisorOptions: build.query<ApiResponse<AdvisorOptions>, void>({
+      query: () => "/admin/products/advisor-options",
+      keepUnusedDataFor: 3600,
+    }),
+    /** Reads an ingredient list without saving */
+    previewIngredients: build.query<
+      ApiResponse<{ ingredients: ProductIngredient[]; analysis: IngredientAnalysis }>,
+      { text: string; claims: string[] }
+    >({
+      query: (body) => ({ url: "/admin/products/ingredients/preview", method: "POST", body }),
+    }),
     listCategoryFields: build.query<ApiResponse<CategoryField[]>, string>({
       query: (categoryId) => `/admin/categories/${categoryId}/fields`,
     }),
@@ -60,5 +72,7 @@ export const {
   useUpdateProductMutation,
   useDeleteProductMutation,
   useListCategoryFieldsQuery,
+  useGetAdvisorOptionsQuery,
+  usePreviewIngredientsQuery,
   useUploadProductPhotoMutation,
 } = productsApi;

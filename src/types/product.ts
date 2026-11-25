@@ -1,3 +1,4 @@
+import type { AdvisorCompleteness, AdvisorProfile, IngredientAnalysis, ProductIngredient } from "./advisor";
 import type { Brand } from "./brand";
 import type { Category } from "./category";
 
@@ -45,6 +46,13 @@ export interface Product extends Omit<ProductSummary, "brand" | "category"> {
   description: string | null;
   howToUse: string | null;
   warnings: string | null;
+  claims: string[];
+  monthsAfterOpening: number | null;
+  ingredients: ProductIngredient[];
+  ingredientsText: string;
+  ingredientAnalysis: IngredientAnalysis;
+  advisor: AdvisorProfile;
+  advisorCompleteness: AdvisorCompleteness;
   attributes: Record<string, AttributeValue>;
   variations: ProductVariation[];
   photos: ProductPhoto[];
@@ -69,6 +77,10 @@ export interface SaveProductRequest {
   description: string;
   howToUse: string;
   warnings: string;
+  claims: string[];
+  monthsAfterOpening: number | null;
+  ingredientsText: string;
+  advisor: AdvisorProfile;
   attributes: Record<string, AttributeValue>;
   variationType: VariationType;
   variations: (Omit<ProductVariation, "id"> & { id?: string })[];

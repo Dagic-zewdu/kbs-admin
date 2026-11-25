@@ -14,12 +14,16 @@ import { getErrorMessage } from "@/lib/api-error";
 import {
   useCreateProductMutation,
   useDeleteProductMutation,
+  useGetAdvisorOptionsQuery,
   useListCategoryFieldsQuery,
   useUpdateProductMutation,
 } from "@/store/api/products.api";
 import type { Brand } from "@/types/brand";
 import type { Category } from "@/types/category";
 import type { AttributeValue, CategoryField, Product, ProductPhoto, VariationType } from "@/types/product";
+import { emptyAdvisorProfile } from "@/types/advisor";
+import { AdvisorSection } from "./advisor-section";
+import { IngredientsSection } from "./ingredients-section";
 import { PhotoManager } from "./photo-manager";
 import { missingLabels } from "./product-labels";
 import { emptyVariation, VariationEditor, type VariationRow } from "./variation-editor";
@@ -34,6 +38,10 @@ const toForm = (product?: Product) => ({
   description: product?.description ?? "",
   howToUse: product?.howToUse ?? "",
   warnings: product?.warnings ?? "",
+  claims: product?.claims ?? [],
+  monthsAfterOpening: product?.monthsAfterOpening ? String(product.monthsAfterOpening) : "",
+  ingredientsText: product?.ingredientsText ?? "",
+  advisor: product?.advisor ?? emptyAdvisorProfile,
   attributes: (product?.attributes ?? {}) as Record<string, AttributeValue>,
   variationType: (product?.variationType ?? "none") as VariationType,
   variations: (product?.variations.map((variation) => ({
@@ -74,6 +82,7 @@ export function ProductForm({ product }: { product?: Product }) {
   const [create, createState] = useCreateProductMutation();
   const [update, updateState] = useUpdateProductMutation();
   const [remove, removeState] = useDeleteProductMutation();
+  const advisorOptions = useGetAdvisorOptionsQuery().data?.data;
   const isSaving = createState.isLoading || updateState.isLoading;
   const error = createState.error || updateState.error;
 
@@ -112,6 +121,10 @@ export function ProductForm({ product }: { product?: Product }) {
       description: form.description,
       howToUse: form.howToUse,
       warnings: form.warnings,
+      claims: form.claims,
+      monthsAfterOpening: form.monthsAfterOpening ? Number(form.monthsAfterOpening) : null,
+      ingredientsText: form.ingredientsText,
+      advisor: { ...form.advisor, keyIngredients: form.advisor.keyIngredients.filter((item) => item.name.trim()) },
       attributes: form.attributes,
       variationType: form.variationType,
       variations: form.variations.map((row) => ({
@@ -140,6 +153,14 @@ export function ProductForm({ product }: { product?: Product }) {
     }
   };
 
+  // The category suggests the routine step, unless staff chose one
+  const chooseCategory = (category: Category | null) =>
+    change({
+      category,
+      attributes: {},
+      advisor: { ...form.advisor, routineStep: form.advisor.routineStep ?? category?.defaultRoutineStep ?? null },
+    });
+
   const missing = product?.missingToGoLive ?? [];
 
   return (
@@ -155,7 +176,7 @@ export function ProductForm({ product }: { product?: Product }) {
           <Input label="Product name" placeholder="Low pH Good Morning Gel Cleanser" required minLength={2} maxLength={200} {...field("name")} />
           <div className="grid gap-4 md:grid-cols-2">
             <BrandSelect label="Brand" value={form.brand} onChange={(brand) => change({ brand })} />
-            <CategorySelect label="Category" value={form.category} onChange={(category) => change({ category, attributes: {} })} />
+            <CategorySelect label="Category" value={form.category} onChange={chooseCategory} />
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <Input label="Country of origin (optional)" placeholder="South Korea" maxLength={100} {...field("countryOfOrigin")} />
@@ -192,6 +213,30 @@ export function ProductForm({ product }: { product?: Product }) {
           <Textarea label="How to use (optional)" rows={3} maxLength={3000} {...field("howToUse")} />
           <Textarea label="Warnings (optional)" rows={2} placeholder="For external use only" maxLength={2000} {...field("warnings")} />
         </Section>
+
+        {advisorOptions && (
+          <>
+            <Section title="Ingredients" description="Warnings and don't-combine rules are worked out from the list.">
+              <IngredientsSection
+                options={advisorOptions}
+                text={form.ingredientsText}
+                claims={form.claims}
+                monthsAfterOpening={form.monthsAfterOpening}
+                onChange={change}
+              />
+            </Section>
+
+            <Section title="Advisor details" description="Helps the AI advisor recommend this product to the right customers.">
+              <AdvisorSection
+                key={product?.updatedAt}
+                options={advisorOptions}
+                value={form.advisor}
+                hasIngredients={Boolean(form.ingredientsText.trim())}
+                onChange={(advisor) => change({ advisor: { ...form.advisor, ...advisor } })}
+              />
+            </Section>
+          </>
+        )}
 
         {(localError || error) && <Alert>{localError || getErrorMessage(error)}</Alert>}
         {notice && <Alert type="success">{notice}</Alert>}

@@ -11,6 +11,8 @@ export interface Category {
   /** Names from the main category down, e.g. ["Skincare", "Cleansers"] */
   path: string[];
   depth: number;
+  /** Suggested routine step for its products */
+  defaultRoutineStep: string | null;
   sortOrder: number;
   childrenCount: number;
 }
