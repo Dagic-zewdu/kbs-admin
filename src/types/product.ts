@@ -1,0 +1,78 @@
+import type { Brand } from "./brand";
+import type { Category } from "./category";
+
+export type ProductStatus = "draft" | "private" | "live" | "archived";
+export type VariationType = "none" | "size" | "shade" | "scent" | "pack";
+export type SizeUnit = "ml" | "g" | "oz" | "pcs" | "sheets";
+export type AttributeValue = string | number | boolean;
+
+export interface ProductSummary {
+  id: string;
+  name: string;
+  slug: string;
+  status: ProductStatus;
+  brand: { id: string; name: string } | null;
+  category: { id: string; path: string[] } | null;
+  mainPhotoUrl: string | null;
+  variationType: VariationType;
+  variationsCount: number;
+  /** What is still needed before it can go live */
+  missingToGoLive: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductVariation {
+  id: string;
+  name: string;
+  sizeValue: number | null;
+  sizeUnit: SizeUnit | null;
+  shadeHex: string | null;
+  barcode: string | null;
+}
+
+export interface ProductPhoto {
+  fileId: string;
+  url: string;
+}
+
+export interface Product extends Omit<ProductSummary, "brand" | "category"> {
+  brand: Brand | null;
+  category: Category | null;
+  countryOfOrigin: string | null;
+  efdaNumber: string | null;
+  shortDescription: string | null;
+  description: string | null;
+  howToUse: string | null;
+  warnings: string | null;
+  attributes: Record<string, AttributeValue>;
+  variations: ProductVariation[];
+  photos: ProductPhoto[];
+}
+
+/** An extra product field of a category, e.g. SPF */
+export interface CategoryField {
+  key: string;
+  label: string;
+  type: "text" | "number" | "boolean" | "select";
+  options: string[];
+  unit: string | null;
+}
+
+export interface SaveProductRequest {
+  name: string;
+  brandId: string | null;
+  categoryId: string | null;
+  countryOfOrigin: string;
+  efdaNumber: string;
+  shortDescription: string;
+  description: string;
+  howToUse: string;
+  warnings: string;
+  attributes: Record<string, AttributeValue>;
+  variationType: VariationType;
+  variations: (Omit<ProductVariation, "id"> & { id?: string })[];
+  photoFileIds: string[];
+}
+
+export const MAX_PHOTOS = 8;

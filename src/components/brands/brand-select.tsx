@@ -9,6 +9,7 @@ import { getErrorMessage } from "@/lib/api-error";
 import { useCreateBrandMutation, useListBrandsQuery, useSearchBrandsQuery } from "@/store/api/brands.api";
 import type { Brand } from "@/types/brand";
 import { BrandLogo } from "./brand-logo";
+import { BrandLogoUpload } from "./brand-logo-upload";
 
 interface BrandSelectProps {
   label: string;
@@ -52,13 +53,15 @@ export function BrandSelect(props: BrandSelectProps) {
 }
 
 function CreateBrandPanel({ name, onBack, onSelect }: CreatePanelProps<Brand>) {
+  const [logoFileId, setLogoFileId] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
   const [country, setCountry] = useState("");
   const [createBrand, { isLoading, error }] = useCreateBrandMutation();
   const errorBody = error && "data" in error ? (error.data as { code?: string; error?: Brand }) : undefined;
   const existing = errorBody?.code === "BRAND_EXISTS" ? errorBody.error : undefined;
 
   const create = async () => {
-    const result = await createBrand({ name, country: country.trim() || undefined });
+    const result = await createBrand({ name, logoFileId: logoFileId || undefined, country: country.trim() || undefined });
     if (result.data) onSelect(result.data.data, true);
   };
 
@@ -72,13 +75,14 @@ function CreateBrandPanel({ name, onBack, onSelect }: CreatePanelProps<Brand>) {
         onKeyDown={(event) => {
           if (event.key === "Enter") {
             event.preventDefault(); // never submits the form around it
-            if (!isLoading) create();
+            if (!isLoading && !isUploading) create();
           }
         }}
         maxLength={100}
         placeholder="South Korea"
         autoFocus
       />
+      <BrandLogoUpload onChange={setLogoFileId} onUploading={setIsUploading} />
       <p className="text-xs text-gray-500">Check the spelling: every company will use this brand, and only the platform can change it later.</p>
       {error && (
         <Alert>
@@ -94,7 +98,7 @@ function CreateBrandPanel({ name, onBack, onSelect }: CreatePanelProps<Brand>) {
         <Button type="button" variant="secondary" onClick={onBack} disabled={isLoading}>
           Back
         </Button>
-        <Button type="button" onClick={create} isLoading={isLoading}>
+        <Button type="button" onClick={create} isLoading={isLoading} disabled={isUploading}>
           Create brand
         </Button>
       </div>

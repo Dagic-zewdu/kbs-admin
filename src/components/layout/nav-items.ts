@@ -33,7 +33,7 @@ export const navSections: NavSection[] = [
   {
     title: "Catalog",
     items: [
-      { label: "Products", href: "/products", icon: Package, comingSoon: true },
+      { label: "Products", href: "/products", icon: Package },
       { label: "Categories", href: "/categories", icon: FolderTree },
       { label: "Brands", href: "/brands", icon: Tag },
       { label: "Inventory", href: "/inventory", icon: Boxes, comingSoon: true },
