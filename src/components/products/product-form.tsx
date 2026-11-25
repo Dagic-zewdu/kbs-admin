@@ -63,12 +63,12 @@ function Section({ title, description, children }: { title: string; description:
 }
 
 /** Create or edit a product. Saved as a draft; only the name is required. */
-export function ProductForm({ product, initialNotice = "" }: { product?: Product; initialNotice?: string }) {
+export function ProductForm({ product }: { product?: Product }) {
   const router = useRouter();
   const [form, setForm] = useState<FormState>(() => toForm(product));
   const [isDirty, setIsDirty] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [notice, setNotice] = useState(initialNotice);
+  const [notice, setNotice] = useState("");
   const [localError, setLocalError] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [create, createState] = useCreateProductMutation();

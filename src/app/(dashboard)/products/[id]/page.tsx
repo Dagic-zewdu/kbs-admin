@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 import { useParams, useSearchParams } from "next/navigation";
 import { ProductForm } from "@/components/products/product-form";
 import { ProductStatusBadge } from "@/components/products/product-labels";
+import { Alert } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
 import { getErrorMessage } from "@/lib/api-error";
 import { useGetProductQuery } from "@/store/api/products.api";
@@ -22,7 +23,8 @@ export default function ProductPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-5">
       <PageHeader title={product.name} backHref="/products" actions={<ProductStatusBadge status={product.status} />} />
-      <ProductForm key={product.id} product={product} initialNotice={created ? "Draft saved. You can keep adding details." : ""} />
+      {created && <Alert type="success">Draft saved. You can keep adding details.</Alert>}
+      <ProductForm key={product.id} product={product} />
     </div>
   );
 }
