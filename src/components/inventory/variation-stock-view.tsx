@@ -53,11 +53,9 @@ export function VariationStockView({ id }: { id: string }) {
         backHref="/inventory"
         actions={
           <>
-            {variation.barcode && (
-              <Button type="button" variant="secondary" onClick={() => setDialog({ type: "labels" })}>
-                <Printer className="size-4" aria-hidden /> Print labels
-              </Button>
-            )}
+            <Button type="button" variant="secondary" onClick={() => setDialog({ type: "labels" })}>
+              <Printer className="size-4" aria-hidden /> Print labels
+            </Button>
             <Button type="button" variant="secondary" onClick={() => setDialog({ type: "reduce" })} disabled={stock.onHand + stock.expired === 0}>
               <Minus className="size-4" aria-hidden /> Decrease
             </Button>
@@ -166,14 +164,19 @@ export function VariationStockView({ id }: { id: string }) {
           onDone={done}
         />
       )}
-      {dialog?.type === "labels" && variation.barcode && (
+      {dialog?.type === "labels" && (
         <PrintLabelsDialog
-          product={product.name}
-          variation={variation.name}
-          barcode={variation.barcode}
-          sku={variation.sku}
-          price={settings ? customerPrice(variation.price, settings) : null}
-          suggested={stock.onHand}
+          items={[
+            {
+              id: variation.id,
+              product: product.name,
+              variation: variation.name,
+              barcode: variation.barcode,
+              sku: variation.sku,
+              price: settings ? customerPrice(variation.price, settings) : null,
+              suggested: stock.onHand,
+            },
+          ]}
           onClose={close}
         />
       )}

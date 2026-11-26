@@ -40,7 +40,7 @@ export interface InventoryItem {
   barcode: string | null;
   price: number | null;
   lowStockLevel: number;
-  product: { id: string; name: string; status: ProductStatus };
+  product: { id: string; name: string; status: ProductStatus; photoUrl?: string | null };
   stock: VariationStock;
 }
 

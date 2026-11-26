@@ -71,11 +71,11 @@ export function Label({ content, paper }: { content: LabelContent; paper: Paper 
   );
 }
 
-/** Every page to print. `skip`: stickers already used on the first sheet */
-export function LabelSheets({ content, paper, count, skip }: { content: LabelContent; paper: Paper; count: number; skip: number }) {
+/** Every page to print, the labels in order. `skip`: stickers already used on the first sheet */
+export function LabelSheets({ labels, paper, skip }: { labels: LabelContent[]; paper: Paper; skip: number }) {
   const perPage = paper.columns * paper.rows;
   const isSheet = perPage > 1;
-  const cells = Array.from({ length: skip + count }, (_, index) => index >= skip);
+  const cells: (LabelContent | null)[] = [...Array.from({ length: skip }, () => null), ...labels];
   const pages = Array.from({ length: Math.ceil(cells.length / perPage) }, (_, page) => cells.slice(page * perPage, (page + 1) * perPage));
   return pages.map((page, pageIndex) => (
     <div
@@ -91,7 +91,7 @@ export function LabelSheets({ content, paper, count, skip }: { content: LabelCon
         breakAfter: pageIndex < pages.length - 1 ? "page" : "auto",
       }}
     >
-      {page.map((isUsed, index) => (isUsed ? <Label key={index} content={content} paper={paper} /> : <div key={index} />))}
+      {page.map((content, index) => (content ? <Label key={index} content={content} paper={paper} /> : <div key={index} />))}
     </div>
   ));
 }

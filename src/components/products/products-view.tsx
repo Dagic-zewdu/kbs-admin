@@ -1,10 +1,11 @@
 "use client";
 
-import { ImageIcon, Loader2, Package, Plus, Search } from "lucide-react";
+import { Loader2, Package, Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { QuickScan } from "@/components/barcode/quick-scan";
+import { FadeImage } from "@/components/ui/fade-image";
 import { Alert } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/pagination";
@@ -24,14 +25,7 @@ const fieldClasses =
 
 function MainPhoto({ product, className }: { product: ProductSummary; className: string }) {
   return (
-    <span className={`flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 ${className}`}>
-      {product.mainPhotoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element -- signed S3 URL
-        <img src={product.mainPhotoUrl} alt="" className="size-full object-contain" />
-      ) : (
-        <ImageIcon className="size-5 text-gray-300" aria-hidden />
-      )}
-    </span>
+    <FadeImage src={product.mainPhotoUrl} className={`rounded-lg border border-gray-200 ${className}`} />
   );
 }
 

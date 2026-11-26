@@ -1,18 +1,22 @@
 "use client";
 
 import clsx from "clsx";
-import { Boxes, Loader2, ScanBarcode, Search } from "lucide-react";
+import { Boxes, Loader2, Printer, ScanBarcode, Search, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { ScannerDialog } from "@/components/barcode/scanner-dialog";
 import { Button } from "@/components/ui/button";
+import { FadeImage } from "@/components/ui/fade-image";
 import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/pagination";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { getErrorMessage } from "@/lib/api-error";
 import { formatDay, formatPrice } from "@/lib/labels";
+import { customerPrice } from "@/lib/pricing";
+import { useGetSettingsQuery } from "@/store/api/settings.api";
 import { useListInventoryQuery } from "@/store/api/inventory.api";
 import type { InventoryFilter, InventoryItem } from "@/types/inventory";
+import { PrintLabelsDialog, type LabelItem } from "./print-labels-dialog";
 
 const PAGE_SIZE = 20;
 
@@ -39,6 +43,27 @@ function OnHand({ item }: { item: InventoryItem }) {
   );
 }
 
+const MAX_SELECTED = 200;
+
+function Photo({ item, className }: { item: InventoryItem; className: string }) {
+  return <FadeImage src={item.product.photoUrl} className={`rounded-lg border border-gray-200 ${className}`} />;
+}
+
+function Check({ checked, label, onChange, disabled }: { checked: boolean; label: string; onChange: (checked: boolean) => void; disabled?: boolean }) {
+  return (
+    <label className="flex size-10 shrink-0 cursor-pointer items-center justify-center">
+      <input
+        type="checkbox"
+        aria-label={label}
+        checked={checked}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.checked)}
+        className="size-4.5 cursor-pointer accent-brand-600 disabled:cursor-not-allowed"
+      />
+    </label>
+  );
+}
+
 const title = (item: InventoryItem) => (item.name ? `${item.product.name} · ${item.name}` : item.product.name);
 
 /** Stock of every variation, with alerts */
@@ -47,12 +72,36 @@ export function InventoryView() {
   const [filter, setFilter] = useState<InventoryFilter>("all");
   const [page, setPage] = useState(1);
   const [isScanning, setIsScanning] = useState(false);
+  // Kept while changing page, search or filter, so labels of several pages print together
+  const [selected, setSelected] = useState<Map<string, InventoryItem>>(new Map());
+  const [isPrinting, setIsPrinting] = useState(false);
+  const settings = useGetSettingsQuery().data?.data;
   const search = useDebouncedValue(searchText.trim());
   const { data, isLoading, isFetching, error } = useListInventoryQuery({ page, limit: PAGE_SIZE, search, filter });
   const result = data?.data;
+  const pageItems = result?.items ?? [];
+  const isPageChosen = pageItems.length > 0 && pageItems.every((item) => selected.has(item.id));
+  const choose = (items: InventoryItem[], isChosen: boolean) =>
+    setSelected((current) => {
+      const next = new Map(current);
+      for (const item of items) {
+        if (!isChosen) next.delete(item.id);
+        else if (next.size < MAX_SELECTED) next.set(item.id, item);
+      }
+      return next;
+    });
+  const labelItems: LabelItem[] = [...selected.values()].map((item) => ({
+    id: item.id,
+    product: item.product.name,
+    variation: item.name,
+    barcode: item.barcode,
+    sku: item.sku,
+    price: settings ? customerPrice(item.price, settings) : null,
+    suggested: item.stock.onHand,
+  }));
 
   return (
-    <div className="space-y-5 sm:space-y-6">
+    <div className={`space-y-5 sm:space-y-6 ${selected.size ? "pb-20" : ""}`}>
       <PageHeader title="Inventory" description="Stock is counted from batches. The batch that expires first is sold first." />
 
       <div className="flex gap-2">
@@ -111,9 +160,11 @@ export function InventoryView() {
           <>
             <ul className="divide-y divide-gray-100 md:hidden">
               {result.items.map((item) => (
-                <li key={item.id}>
-                  <Link href={`/inventory/${item.id}`} className="flex justify-between gap-3 px-4 py-4 text-sm active:bg-brand-50/40">
-                    <span className="min-w-0">
+                <li key={item.id} className="flex items-center pl-1">
+                  <Check checked={selected.has(item.id)} label={`Choose ${title(item)}`} onChange={(isChosen) => choose([item], isChosen)} />
+                  <Link href={`/inventory/${item.id}`} className="flex min-w-0 flex-1 items-center justify-between gap-3 py-3 pl-1 pr-4 text-sm active:bg-brand-50/40">
+                    <Photo item={item} className="size-12" />
+                    <span className="min-w-0 flex-1">
                       <span className="block break-words font-medium text-gray-900">{title(item)}</span>
                       <span className="block break-words text-xs text-gray-500">{item.sku}</span>
                       {item.stock.nextExpiry && <span className="block text-xs text-gray-500">Expires {formatDay(item.stock.nextExpiry)}</span>}
@@ -129,6 +180,9 @@ export function InventoryView() {
               <table className="w-full text-left text-sm">
                 <thead className="border-b border-gray-100 bg-gray-50/60 text-xs uppercase tracking-wide text-gray-500">
                   <tr>
+                    <th className="w-12 py-1 pl-2">
+                      <Check checked={isPageChosen} label="Choose every product on this page" onChange={(isChosen) => choose(pageItems, isChosen)} />
+                    </th>
                     <th className="px-4 py-3 font-medium">Product</th>
                     <th className="px-4 py-3 font-medium">SKU</th>
                     <th className="hidden px-4 py-3 font-medium lg:table-cell">Barcode</th>
@@ -139,10 +193,14 @@ export function InventoryView() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {result.items.map((item) => (
-                    <tr key={item.id} className="hover:bg-brand-50/30">
-                      <td className="max-w-80 px-4 py-3">
-                        <Link href={`/inventory/${item.id}`} className="block truncate font-medium text-gray-900 hover:text-brand-700">
-                          {title(item)}
+                    <tr key={item.id} className={selected.has(item.id) ? "bg-brand-50/50" : "hover:bg-brand-50/30"}>
+                      <td className="py-1 pl-2">
+                        <Check checked={selected.has(item.id)} label={`Choose ${title(item)}`} onChange={(isChosen) => choose([item], isChosen)} />
+                      </td>
+                      <td className="max-w-80 px-4 py-2">
+                        <Link href={`/inventory/${item.id}`} className="flex items-center gap-3 font-medium text-gray-900 hover:text-brand-700">
+                          <Photo item={item} className="size-10" />
+                          <span className="truncate">{title(item)}</span>
                         </Link>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-gray-600">{item.sku}</td>
@@ -161,6 +219,24 @@ export function InventoryView() {
           </>
         )}
       </section>
+
+      {selected.size > 0 && (
+        // Above the phone's bottom menu
+        <div className="pointer-events-none fixed inset-x-0 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 flex justify-center px-4 lg:bottom-6 lg:pl-64">
+          <div role="region" aria-label="Chosen products" className="pointer-events-auto flex items-center gap-2 rounded-2xl bg-gray-900 py-2 pl-4 pr-2 text-sm text-white shadow-xl">
+            <span className="whitespace-nowrap">
+              <strong className="font-semibold">{selected.size}</strong> chosen{selected.size >= MAX_SELECTED && ` (at most ${MAX_SELECTED})`}
+            </span>
+            <Button type="button" onClick={() => setIsPrinting(true)} className="ml-2">
+              <Printer className="size-4" aria-hidden /> Print labels
+            </Button>
+            <button type="button" onClick={() => setSelected(new Map())} aria-label="Clear the choice" className="flex size-10 items-center justify-center rounded-lg hover:bg-white/10">
+              <X className="size-4" />
+            </button>
+          </div>
+        </div>
+      )}
+      {isPrinting && <PrintLabelsDialog items={labelItems} onClose={() => setIsPrinting(false)} />}
 
       {isScanning && (
         <ScannerDialog

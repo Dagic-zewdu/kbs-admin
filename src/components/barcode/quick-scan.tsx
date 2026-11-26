@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { FormDialog } from "@/components/inventory/form-dialog";
 import { ProductStatusBadge } from "@/components/products/product-labels";
+import { FadeImage } from "@/components/ui/fade-image";
 import { Button } from "@/components/ui/button";
 import { getErrorMessage } from "@/lib/api-error";
 import { formatDay, formatPrice } from "@/lib/labels";
@@ -52,10 +53,7 @@ function QuickScanDialog({ onClose }: { onClose: () => void }) {
       {item && (
         <div className="space-y-3 rounded-lg border border-gray-200 p-3" role="status">
           <div className="flex gap-3">
-            {item.product.photoUrl && (
-              // eslint-disable-next-line @next/next/no-img-element -- signed S3 URL
-              <img src={item.product.photoUrl} alt="" className="size-16 shrink-0 rounded-lg border border-gray-200 object-contain" />
-            )}
+            {item.product.photoUrl && <FadeImage src={item.product.photoUrl} className="size-16 rounded-lg border border-gray-200" />}
             <div className="min-w-0 text-sm">
               <p className="break-words font-semibold text-gray-900">{[item.product.name, item.variation.name].filter(Boolean).join(" · ")}</p>
               <p className="text-gray-600">{[item.product.brand, item.variation.sku].filter(Boolean).join(" · ")}</p>

@@ -1,5 +1,6 @@
 "use client";
 
+import { FadeImage } from "@/components/ui/fade-image";
 import { ArrowLeft, ArrowRight, Camera, Loader2, Trash2 } from "lucide-react";
 import { useId, useRef, useState } from "react";
 import { getErrorMessage } from "@/lib/api-error";
@@ -67,8 +68,7 @@ export function PhotoManager({ photos, onChange, onUploading }: PhotoManagerProp
         {photos.map((photo, index) => (
           <li key={photo.fileId} className="overflow-hidden rounded-xl border border-gray-200 bg-white">
             <div className="relative aspect-square bg-gray-50">
-              {/* eslint-disable-next-line @next/next/no-img-element -- signed S3 URL */}
-              <img src={photo.url} alt={`Photo ${index + 1}`} className="size-full object-contain" />
+              <FadeImage src={photo.url} alt={`Photo ${index + 1}`} className="size-full" />
               {index === 0 && (
                 <span className="absolute left-2 top-2 rounded-full bg-brand-600 px-2 py-0.5 text-xs font-medium text-white">Main</span>
               )}
