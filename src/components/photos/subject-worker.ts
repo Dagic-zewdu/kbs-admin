@@ -19,8 +19,8 @@ export interface SubjectResult {
 const MODEL = "/models/u2netp-any.onnx";
 
 type Ort = typeof import("onnxruntime-web/wasm");
-const start = async (): Promise<{ ort: Ort; model: InferenceSession }> => {
-  const gpu = (navigator as Navigator & { gpu?: { requestAdapter: () => Promise<unknown> } }).gpu;
+const start = async (useGpu: boolean): Promise<{ ort: Ort; model: InferenceSession }> => {
+  const gpu = useGpu ? (navigator as Navigator & { gpu?: { requestAdapter: () => Promise<unknown> } }).gpu : undefined;
   if (gpu && (await gpu.requestAdapter().catch(() => null))) {
     try {
       const ort = (await import("onnxruntime-web/webgpu")) as Ort;
@@ -40,16 +40,24 @@ const start = async (): Promise<{ ort: Ort; model: InferenceSession }> => {
   console.info("Product check: processor");
   return { ort, model };
 };
-const engine = start();
+/** Set by the page's first message: the graphics chip, or the processor when the chip made the camera picture freeze */
+let engine: ReturnType<typeof start> | null = null;
 
 const scope = self as unknown as {
-  onmessage: (event: MessageEvent<{ id: number; image: ImageData }>) => void;
+  onmessage: (event: MessageEvent<{ engine: Engine } | { id: number; image: ImageData }>) => void;
   postMessage: (message: { id: number; result?: SubjectResult; error?: string }) => void;
 };
 
-scope.onmessage = async ({ data: { id, image } }) => {
+export type Engine = "gpu" | "cpu";
+
+scope.onmessage = async ({ data }) => {
+  if ("engine" in data) {
+    engine = start(data.engine === "gpu");
+    return;
+  }
+  const { id, image } = data;
   try {
-    const { ort, model } = await engine;
+    const { ort, model } = await (engine ??= start(true));
     const area = SUBJECT_SIZE * SUBJECT_SIZE;
     const input = new Float32Array(3 * area);
     for (let i = 0; i < area; i++) for (let c = 0; c < 3; c++) input[c * area + i] = (image.data[i * 4 + c] / 255 - MEAN[c]) / STD[c];

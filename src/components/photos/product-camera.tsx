@@ -10,9 +10,33 @@ import { PhotoSizes } from "./photo-sizes";
 import { useOptimizePhotoMutation, useUploadProductPhotoMutation } from "@/store/api/products.api";
 import type { ProductPhoto } from "@/types/product";
 import { judgePhoto, measureFrame, type CheckLevel, type PhotoCheck } from "./photo-check";
-import { SUBJECT_SIZE, type SubjectResult } from "./subject-worker";
+import { SUBJECT_SIZE, type Engine, type SubjectResult } from "./subject-worker";
 
 const FRAME_SIZE = 160;
+/** The shortest rest between two product checks */
+const MIN_REST_MS = 150;
+/** A live picture that stops for this long has frozen */
+const FREEZE_MS = 250;
+/** This many freezes within FREEZE_WINDOW_MS move the check off the graphics chip */
+const FREEZES_TO_SWITCH = 3;
+const FREEZE_WINDOW_MS = 5000;
+const ENGINE_KEY = "kbs.productCheckEngine";
+
+/** The processor once this device's graphics chip made the picture freeze, else the graphics chip */
+const savedEngine = (): Engine => {
+  try {
+    return localStorage.getItem(ENGINE_KEY) === "cpu" ? "cpu" : "gpu";
+  } catch {
+    return "gpu";
+  }
+};
+const saveEngine = (engine: Engine) => {
+  try {
+    localStorage.setItem(ENGINE_KEY, engine);
+  } catch {
+    // Private window: it is simply worked out again next time
+  }
+};
 const FRAME_EVERY_MS = 250;
 
 const looks: Record<CheckLevel, { icon: typeof CheckCircle2; className: string; box: string }> = {
@@ -87,9 +111,7 @@ export function ProductCamera({ onUse, onClose }: ProductCameraProps) {
     let isStopped = false;
     let stream: MediaStream | undefined;
     let frameTimer: ReturnType<typeof setInterval>;
-    const worker = new Worker(new URL("./subject-worker.ts", import.meta.url), {
-      type: "module",
-    });
+    let worker: Worker | undefined;
 
     const start = async () => {
       try {
@@ -117,7 +139,16 @@ export function ProductCamera({ onUse, onClose }: ProductCameraProps) {
           setFrame(measureFrame(smallContext.getImageData(0, 0, FRAME_SIZE, FRAME_SIZE)));
         }, FRAME_EVERY_MS);
 
-        // The product: as often as the phone can, one frame at a time
+        /*
+         * The product, one frame at a time. The live picture comes first:
+         * the check rests at least as long as it worked, and if the picture still freezes
+         * (a phone's graphics chip busy with the check), the check moves to the processor.
+         */
+        let engine = savedEngine();
+        let sentAt = 0;
+        let gotResult = false;
+        /** One frame at the checker at a time, even right after a switch */
+        let isChecking = false;
         const model = document.createElement("canvas");
         model.width = SUBJECT_SIZE;
         model.height = SUBJECT_SIZE;
@@ -126,25 +157,61 @@ export function ProductCamera({ onUse, onClose }: ProductCameraProps) {
         })!;
         let id = 0;
         const next = () => {
-          if (isStopped || !video.videoWidth) return;
+          if (isStopped || !video.videoWidth || isChecking) return;
           if (isPausedRef.current) {
             setTimeout(next, 300);
             return;
           }
           modelContext.drawImage(video, 0, 0, SUBJECT_SIZE, SUBJECT_SIZE);
           const image = modelContext.getImageData(0, 0, SUBJECT_SIZE, SUBJECT_SIZE);
-          worker.postMessage({ id: ++id, image }, [image.data.buffer]);
+          sentAt = performance.now();
+          isChecking = true;
+          worker?.postMessage({ id: ++id, image }, [image.data.buffer]);
         };
-        worker.onmessage = ({ data }: MessageEvent<{ result?: SubjectResult; error?: string }>) => {
-          if (isStopped) return;
-          if (data.result && !isPausedRef.current) {
-            setSubject(data.result);
-            setLayout(measureVideo(video));
-          }
-          if (data.error) console.error("Product check:", data.error);
-          setTimeout(next, 100);
+        const startWorker = () => {
+          worker?.terminate();
+          const current = new Worker(new URL("./subject-worker.ts", import.meta.url), { type: "module" });
+          worker = current;
+          current.postMessage({ engine });
+          current.onmessage = ({ data }: MessageEvent<{ id: number; result?: SubjectResult; error?: string }>) => {
+            if (isStopped || current !== worker) return;
+            isChecking = false;
+            if (data.result && !isPausedRef.current) {
+              gotResult = true;
+              setSubject(data.result);
+              setLayout(measureVideo(video));
+            }
+            if (data.error) console.error("Product check:", data.error);
+            setTimeout(next, Math.max(MIN_REST_MS, performance.now() - sentAt));
+          };
         };
+        startWorker();
         next();
+
+        // Watches the live picture; ignores long gaps from a hidden tab
+        if ("requestVideoFrameCallback" in video) {
+          let last = performance.now();
+          let freezes: number[] = [];
+          const watch = () => {
+            if (isStopped) return;
+            const now = performance.now();
+            const gap = now - last;
+            last = now;
+            if (engine === "gpu" && gotResult && !isPausedRef.current && gap > FREEZE_MS && gap < 2000 && document.visibilityState === "visible") {
+              freezes = [...freezes.filter((at) => now - at < FREEZE_WINDOW_MS), now];
+              if (freezes.length >= FREEZES_TO_SWITCH) {
+                console.info("Product check: the camera picture froze, moving the check to the processor");
+                engine = "cpu";
+                saveEngine("cpu");
+                startWorker();
+                isChecking = false;
+                next();
+              }
+            }
+            video.requestVideoFrameCallback(watch);
+          };
+          video.requestVideoFrameCallback(watch);
+        }
       } catch (problem) {
         if (!isStopped) setError(cameraError(problem));
       }
@@ -154,7 +221,7 @@ export function ProductCamera({ onUse, onClose }: ProductCameraProps) {
     return () => {
       isStopped = true;
       clearInterval(frameTimer);
-      worker.terminate();
+      worker?.terminate();
       stream?.getTracks().forEach((track) => track.stop());
     };
   }, []);
