@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/copy-ort.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/copy-ort.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
@@ -14,6 +16,8 @@
     "clsx": "^2.1.1",
     "lucide-react": "^1.74.0",
     "next": "16.4.6",
+    "onnxruntime-web": "1.23.2",
+    "ppu-paddle-ocr": "6.6.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-hook-form": "^7.92.0",

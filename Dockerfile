@@ -31,6 +31,8 @@ RUN npm install -g pm2@6 && npm cache clean --force
 
 COPY --from=build --chown=node:node /app/.next/standalone ./
 COPY --from=build --chown=node:node /app/.next/static ./.next/static
+# Expiry-date reader: engine and models
+COPY --from=build --chown=node:node /app/public ./public
 COPY --chown=node:node ecosystem.config.js ./
 
 USER node

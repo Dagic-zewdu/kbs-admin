@@ -42,7 +42,7 @@ const createNative = async () => {
   }
 };
 
-const createWorker = () => {
+export const createWorker = (gs1 = false) => {
   const worker = new Worker(new URL("./barcode-worker.ts", import.meta.url), { type: "module" });
   const waiting = new Map<number, (found: Found | null) => void>();
   let lastId = 0;
@@ -67,7 +67,7 @@ const createWorker = () => {
         setTimeout(() => {
           if (waiting.delete(id)) resolve(null);
         }, WORKER_TIMEOUT_MS);
-        worker.postMessage({ id, image }, [image.data.buffer]);
+        worker.postMessage({ id, image, gs1 }, [image.data.buffer]);
       }),
     hasFailed: () => hasFailed,
     stop: () => {

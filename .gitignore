@@ -27,3 +27,6 @@ yarn-error.log*
 .vercel
 
 .claude/
+
+# Copied from node_modules by scripts/copy-ort.mjs
+/public/ort/

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ExpiryField } from "@/components/expiry/expiry-field";
 import { RequiredMark } from "@/components/ui/required-mark";
 import { wholeText } from "@/lib/numbers";
 import type { BatchDetails, ReceiveBatch } from "@/types/inventory";
@@ -65,9 +66,12 @@ export function BatchFields({ value, onChange, expiryRequired, withQuantity = tr
             />
           </Field>
         )}
-        <Field label={expiryRequired ? "Expiry date" : "Expiry date (optional)"} isRequired={expiryRequired}>
-          <input type="date" value={value.expiryDate} onChange={(event) => onChange({ expiryDate: event.target.value })} className={inputClasses} />
-        </Field>
+        <ExpiryField
+          label={expiryRequired ? "Expiry date" : "Expiry date (optional)"}
+          isRequired={expiryRequired}
+          value={value.expiryDate}
+          onChange={(expiryDate) => onChange({ expiryDate })}
+        />
         {children}
       </div>
       {showMore ? (
