@@ -170,9 +170,9 @@ export function PhotoManager({ photos, onChange, onUploading, productId, onSaved
       {isTakingPhoto && (
         <ProductCamera
           onClose={() => setIsTakingPhoto(false)}
-          onPhoto={(file) => {
+          onUse={(photo) => {
             setIsTakingPhoto(false);
-            add([file]);
+            onChange((current) => (current.length < MAX_PHOTOS ? [...current, photo] : current));
           }}
         />
       )}
