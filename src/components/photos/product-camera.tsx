@@ -213,6 +213,10 @@ export function ProductCamera({ onUse, onClose }: ProductCameraProps) {
       const result = await optimize({ fileId: original.fileId });
       if (!result.data) throw new Error(getErrorMessage(result.error));
       const { photo, original: kept } = result.data.data;
+      // Shown only once it has loaded, so the old picture never sits under "Optimized"
+      const preload = new Image();
+      preload.src = photo.url;
+      await preload.decode().catch(() => undefined);
       setOptimized({
         fileId: photo.fileId,
         url: photo.url,
