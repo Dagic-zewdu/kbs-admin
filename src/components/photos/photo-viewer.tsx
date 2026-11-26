@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { getErrorMessage } from "@/lib/api-error";
 import { useOptimizePhotoMutation } from "@/store/api/products.api";
 import type { ProductPhoto } from "@/types/product";
+import { formatBytes, PhotoSizes } from "./photo-sizes";
 import { ZoomImage } from "./zoom-image";
 
 interface PhotoViewerProps {
@@ -40,9 +41,9 @@ export function PhotoViewer({ photo, label, productId, onOptimized, onClose }: P
     const result = await optimize({ fileId: photo.fileId, productId });
     if (!result.data) return;
     const { photo: made, original } = result.data.data;
-    onOptimized({ fileId: made.fileId, url: made.url, original: { fileId: original.fileId, url: original.url } });
+    onOptimized({ fileId: made.fileId, url: made.url, size: made.size, original: { fileId: original.fileId, url: original.url, size: original.size } });
     setShown("current");
-    setNotice(`Optimized: ${Math.round(made.size / 1024)} KB. ${productId ? "The product now shows it." : "Save the product to keep it."} The original is kept.`);
+    setNotice(`Optimized: ${formatBytes(made.size)}. ${productId ? "The product now shows it." : "Save the product to keep it."} The original is kept.`);
   };
 
   return createPortal(
@@ -80,6 +81,8 @@ export function PhotoViewer({ photo, label, productId, onOptimized, onClose }: P
                 className={clsx("min-h-9 rounded-md", shown === item ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900")}
               >
                 {item === "current" ? "Optimized (shown on the product)" : "Original"}
+                {item === "current" && photo.size ? ` · ${formatBytes(photo.size)}` : ""}
+                {item === "original" && photo.original?.size ? ` · ${formatBytes(photo.original.size)}` : ""}
               </button>
             ))}
           </div>
@@ -95,6 +98,7 @@ export function PhotoViewer({ photo, label, productId, onOptimized, onClose }: P
           )}
         </div>
 
+        <PhotoSizes original={isOptimized ? photo.original?.size : photo.size} optimized={isOptimized ? photo.size : undefined} />
         {error && <Alert>{getErrorMessage(error)}</Alert>}
         {notice && <Alert type="success">{notice}</Alert>}
         <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">

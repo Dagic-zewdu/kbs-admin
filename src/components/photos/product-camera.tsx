@@ -6,6 +6,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { cameraError, keepFocusing, openCamera, savedCamera } from "@/components/barcode/camera";
 import { getErrorMessage } from "@/lib/api-error";
 import { resizeImage } from "@/lib/resize-image";
+import { PhotoSizes } from "./photo-sizes";
 import { useOptimizePhotoMutation, useUploadProductPhotoMutation } from "@/store/api/products.api";
 import type { ProductPhoto } from "@/types/product";
 import { judgePhoto, measureFrame, type CheckLevel, type PhotoCheck } from "./photo-check";
@@ -170,10 +171,9 @@ export function ProductCamera({ onUse, onClose }: ProductCameraProps) {
     setIsTaking(false);
     if (!blob) return;
     isPausedRef.current = true;
-    const file = new File([blob], `photo-${Date.now()}.jpg`, {
-      type: "image/jpeg",
-    });
-    setShot({ file, preview: URL.createObjectURL(blob) });
+    // Made upload-ready now, so the size shown is the size saved
+    const file = await resizeImage(new File([blob], `photo-${Date.now()}.jpg`, { type: "image/jpeg" }));
+    setShot({ file, preview: URL.createObjectURL(file) });
   };
 
   const retake = () => {
@@ -197,9 +197,9 @@ export function ProductCamera({ onUse, onClose }: ProductCameraProps) {
 
   const uploadShot = async (taken: Shot) => {
     if (uploaded) return uploaded;
-    const result = await upload(await resizeImage(taken.file));
+    const result = await upload(taken.file);
     if (!result.data) throw new Error(getErrorMessage(result.error));
-    const photo = { fileId: result.data.data.id, url: result.data.data.url };
+    const photo = { fileId: result.data.data.id, url: result.data.data.url, size: result.data.data.size };
     setUploaded(photo);
     return photo;
   };
@@ -221,7 +221,7 @@ export function ProductCamera({ onUse, onClose }: ProductCameraProps) {
         fileId: photo.fileId,
         url: photo.url,
         size: photo.size,
-        original: { fileId: kept.fileId, url: kept.url },
+        original: { fileId: kept.fileId, url: kept.url, size: kept.size },
       });
       setShown("optimized");
     } catch (failure) {
@@ -233,7 +233,7 @@ export function ProductCamera({ onUse, onClose }: ProductCameraProps) {
   const usePhoto = async () => {
     if (!shot) return;
     if (optimized && shown === "optimized") {
-      return onUse({ fileId: optimized.fileId, url: optimized.url, original: optimized.original });
+      return onUse(optimized);
     }
     setBusy("saving");
     setProblem("");
@@ -320,7 +320,7 @@ export function ProductCamera({ onUse, onClose }: ProductCameraProps) {
                   onClick={() => setShown(item)}
                   className={clsx("rounded-full px-3 py-1.5 font-medium", shown === item ? "bg-white text-gray-900" : "text-white hover:bg-white/10")}
                 >
-                  {item === "optimized" ? `Optimized (${Math.round(optimized.size / 1024)} KB)` : "Original"}
+                  {item === "optimized" ? "Optimized" : "Original"}
                 </button>
               ))}
             </div>
@@ -340,7 +340,8 @@ export function ProductCamera({ onUse, onClose }: ProductCameraProps) {
         </div>
 
         {shot ? (
-          <div className="space-y-2 px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <div className="max-h-[45dvh] space-y-3 overflow-y-auto px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <PhotoSizes tone="dark" original={optimized?.original?.size ?? shot.file.size} optimized={optimized?.size} />
             {problem && (
               <p role="alert" className="rounded-lg bg-red-600/90 px-3 py-2 text-sm">
                 {problem}

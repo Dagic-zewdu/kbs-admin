@@ -49,8 +49,8 @@ export function PhotoManager({ photos, onChange, onUploading, productId, onSaved
       try {
         const result = await upload(await resizeImage(file));
         if (result.data) {
-          const { id, url } = result.data.data;
-          onChange((current) => [...current, { fileId: id, url }]);
+          const { id, url, size } = result.data.data;
+          onChange((current) => [...current, { fileId: id, url, size }]);
         } else problems.push(`${file.name}: ${getErrorMessage(result.error)}`);
       } catch {
         problems.push(`${file.name} can't be read. Use a JPEG, PNG or WebP photo.`);
