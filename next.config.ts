@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
     return [
       { source: "/ocr/:path*", headers: cacheForever },
       { source: "/ort/:path*", headers: cacheForever },
+      { source: "/models/:path*", headers: cacheForever },
     ];
   },
   turbopack: {

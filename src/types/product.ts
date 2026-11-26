@@ -53,6 +53,8 @@ export interface ProductVariation {
 export interface ProductPhoto {
   fileId: string;
   url: string;
+  /** When this is an optimized copy: the photo it was made from, kept */
+  original?: { fileId: string; url: string } | null;
 }
 
 export interface Product extends Omit<ProductSummary, "brand" | "category"> {

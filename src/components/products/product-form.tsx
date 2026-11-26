@@ -411,6 +411,8 @@ export function ProductForm({ product, barcode = "" }: { product?: Product; barc
               setNotice("");
             }}
             onUploading={setIsUploading}
+            productId={product?.id}
+            onSaved={(updatePhotos) => setForm((current) => ({ ...current, photos: updatePhotos(current.photos) }))}
           />
         </Section>
 

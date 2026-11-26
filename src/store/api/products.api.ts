@@ -52,6 +52,14 @@ export const productsApi = baseApi.injectEndpoints({
       query: (id) => ({ url: `/admin/products/${id}`, method: "DELETE" }),
       invalidatesTags: ["Products", "Inventory"],
     }),
+    /** A white-background copy; the original is kept. With productId the product uses it right away. */
+    optimizePhoto: build.mutation<
+      ApiResponse<{ photo: { fileId: string; url: string; size: number }; original: { fileId: string; url: string; size: number } }>,
+      { fileId: string; productId?: string }
+    >({
+      query: ({ fileId, productId }) => ({ url: `/admin/files/${fileId}/optimize`, method: "POST", body: { productId } }),
+      invalidatesTags: (_result, _error, { productId }) => (productId ? ["Products", "Inventory", { type: "Product", id: productId }] : []),
+    }),
     getAdvisorOptions: build.query<ApiResponse<AdvisorOptions>, void>({
       query: () => "/admin/products/advisor-options",
       keepUnusedDataFor: 3600,
@@ -91,4 +99,5 @@ export const {
   useGetAdvisorOptionsQuery,
   usePreviewIngredientsQuery,
   useUploadProductPhotoMutation,
+  useOptimizePhotoMutation,
 } = productsApi;

@@ -1,7 +1,9 @@
 "use client";
 
 import { FadeImage } from "@/components/ui/fade-image";
-import { ArrowLeft, ArrowRight, Camera, Loader2, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Camera, Loader2, Sparkles, Trash2, Upload } from "lucide-react";
+import { PhotoViewer } from "@/components/photos/photo-viewer";
+import { ProductCamera } from "@/components/photos/product-camera";
 import { useId, useRef, useState } from "react";
 import { getErrorMessage } from "@/lib/api-error";
 import { resizeImage } from "@/lib/resize-image";
@@ -13,15 +15,23 @@ interface PhotoManagerProps {
   /** Gets the change as a function, because uploads finish while other photos change */
   onChange: (update: (photos: ProductPhoto[]) => ProductPhoto[]) => void;
   onUploading: (isUploading: boolean) => void;
+  /** Saved product: an optimized photo is used right away */
+  productId?: string;
+  /** The photo was replaced on the server already: nothing new to save */
+  onSaved?: (update: (photos: ProductPhoto[]) => ProductPhoto[]) => void;
 }
 
 /** Up to 8 photos. The first is the main photo; the arrows change the order. */
-export function PhotoManager({ photos, onChange, onUploading }: PhotoManagerProps) {
+export function PhotoManager({ photos, onChange, onUploading, productId, onSaved }: PhotoManagerProps) {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [remaining, setRemaining] = useState(0);
   const [message, setMessage] = useState("");
   const [upload] = useUploadProductPhotoMutation();
+  const [viewing, setViewing] = useState<string | null>(null);
+  const [isTakingPhoto, setIsTakingPhoto] = useState(false);
+  const viewed = photos.find((photo) => photo.fileId === viewing);
+  const viewedIndex = viewed ? photos.indexOf(viewed) : -1;
   const room = MAX_PHOTOS - photos.length;
   const isUploading = remaining > 0;
 
@@ -68,9 +78,16 @@ export function PhotoManager({ photos, onChange, onUploading }: PhotoManagerProp
         {photos.map((photo, index) => (
           <li key={photo.fileId} className="overflow-hidden rounded-xl border border-gray-200 bg-white">
             <div className="relative aspect-square bg-gray-50">
-              <FadeImage src={photo.url} alt={`Photo ${index + 1}`} className="size-full" />
+              <button type="button" onClick={() => setViewing(photo.fileId)} aria-label={`Open photo ${index + 1}`} className="block size-full cursor-zoom-in">
+                <FadeImage src={photo.url} alt={`Photo ${index + 1}`} className="size-full" />
+              </button>
               {index === 0 && (
-                <span className="absolute left-2 top-2 rounded-full bg-brand-600 px-2 py-0.5 text-xs font-medium text-white">Main</span>
+                <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-brand-600 px-2 py-0.5 text-xs font-medium text-white">Main</span>
+              )}
+              {photo.original && (
+                <span className="pointer-events-none absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 text-xs font-medium text-emerald-700 shadow-sm">
+                  <Sparkles className="size-3" aria-hidden /> Optimized
+                </span>
               )}
             </div>
             <div className="flex justify-between border-t border-gray-100">
@@ -98,7 +115,16 @@ export function PhotoManager({ photos, onChange, onUploading }: PhotoManagerProp
           </li>
         ))}
         {room > 0 && (
-          <li>
+          <li className="grid min-h-36 gap-2">
+            <button
+              type="button"
+              disabled={isUploading}
+              onClick={() => setIsTakingPhoto(true)}
+              className="flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-brand-300 bg-brand-50/40 p-3 text-center text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50"
+            >
+              {isUploading ? <Loader2 className="size-6 animate-spin" aria-hidden /> : <Camera className="size-6" aria-hidden />}
+              {isUploading ? `Uploading ${remaining}…` : "Take a photo"}
+            </button>
             <label
               htmlFor={inputId}
               onDragOver={(event) => event.preventDefault()}
@@ -106,17 +132,9 @@ export function PhotoManager({ photos, onChange, onUploading }: PhotoManagerProp
                 event.preventDefault();
                 add([...event.dataTransfer.files]);
               }}
-              className="flex h-full min-h-36 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-300 p-3 text-center text-sm font-medium text-brand-700 focus-within:border-brand-500 hover:border-brand-300 hover:bg-brand-50/40"
+              className="flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-gray-300 p-2 text-center text-sm font-medium text-gray-700 focus-within:border-brand-500 hover:border-brand-300 hover:bg-brand-50/40"
             >
-              {isUploading ? (
-                <>
-                  <Loader2 className="size-6 animate-spin" aria-hidden /> Uploading {remaining}…
-                </>
-              ) : (
-                <>
-                  <Camera className="size-6" aria-hidden /> Add photos
-                </>
-              )}
+              <Upload className="size-4" aria-hidden /> Upload photos
               <input
                 ref={inputRef}
                 id={inputId}
@@ -135,6 +153,29 @@ export function PhotoManager({ photos, onChange, onUploading }: PhotoManagerProp
         {photos.length} of {MAX_PHOTOS} photos. At least 1 is needed to go live.
       </p>
       {message && <p className="text-sm text-red-600">{message}</p>}
+      {viewed && (
+        <PhotoViewer
+          photo={viewed}
+          label={`Photo ${viewedIndex + 1}${viewedIndex === 0 ? " (main)" : ""}`}
+          productId={productId}
+          onClose={() => setViewing(null)}
+          onOptimized={(made) => {
+            const replace = (current: ProductPhoto[]) => current.map((item) => (item.fileId === viewed.fileId ? made : item));
+            if (productId && onSaved) onSaved(replace);
+            else onChange(replace);
+            setViewing(made.fileId);
+          }}
+        />
+      )}
+      {isTakingPhoto && (
+        <ProductCamera
+          onClose={() => setIsTakingPhoto(false)}
+          onPhoto={(file) => {
+            setIsTakingPhoto(false);
+            add([file]);
+          }}
+        />
+      )}
     </div>
   );
 }
