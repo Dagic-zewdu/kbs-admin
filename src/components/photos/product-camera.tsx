@@ -299,7 +299,8 @@ export function ProductCamera({ onUse, onClose }: ProductCameraProps) {
 
   const usePhoto = async () => {
     if (!shot) return;
-    if (optimized && shown === "optimized") {
+    // Once optimized, the optimized photo is used; the Original tab is only for comparing (the original stays kept as its source)
+    if (optimized) {
       return onUse(optimized);
     }
     setBusy("saving");
@@ -439,7 +440,7 @@ export function ProductCamera({ onUse, onClose }: ProductCameraProps) {
                 className="flex min-h-12 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-2 text-sm font-semibold hover:bg-emerald-500 disabled:opacity-40"
               >
                 {busy === "saving" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Check className="size-4" aria-hidden />}
-                Use photo
+                {optimized ? "Use optimized photo" : "Use photo"}
               </button>
             </div>
           </div>
