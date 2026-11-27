@@ -245,11 +245,18 @@ function ProductFormSteps({ product, barcode = "", storageKey }: { product?: Pro
         savedAt: Date.now(),
         baseUpdatedAt,
       });
-    const timer = window.setTimeout(keep, 400);
-    window.addEventListener("pagehide", keep);
+    // Leaving the page writes only a change not kept yet, so an old tab can't overwrite what another tab kept
+    let isKept = false;
+    const keepNow = () => {
+      if (isKept) return;
+      isKept = true;
+      keep();
+    };
+    const timer = window.setTimeout(keepNow, 400);
+    window.addEventListener("pagehide", keepNow);
     return () => {
       window.clearTimeout(timer);
-      window.removeEventListener("pagehide", keep);
+      window.removeEventListener("pagehide", keepNow);
     };
   }, [form, isDirty, step, visited, storageKey, baseUpdatedAt]);
 

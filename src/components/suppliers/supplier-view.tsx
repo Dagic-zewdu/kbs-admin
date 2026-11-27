@@ -90,7 +90,7 @@ export function SupplierView({ id }: { id: string }) {
 
       <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
-          { label: "Bought", value: formatPrice(supplier.money.total), hint: `${supplier.money.deliveries} deliveries` },
+          { label: "Bought", value: formatPrice(supplier.money.total), hint: `${supplier.money.deliveries} ${supplier.money.deliveries === 1 ? "delivery" : "deliveries"}` },
           { label: "Paid", value: formatPrice(supplier.money.paid) },
           { label: "We owe", value: formatPrice(supplier.money.owed), tone: supplier.money.owed > 0 ? "amber" : undefined },
           { label: "Overdue", value: formatPrice(supplier.money.overdue), tone: supplier.money.overdue > 0 ? "red" : undefined },
