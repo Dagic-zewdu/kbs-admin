@@ -1,3 +1,5 @@
+import type { PaymentAccount, PaymentAccountInput } from "./payment-account";
+
 export type SupplierVisibility = "private" | "shared";
 export type PaymentStatus = "paid" | "partial" | "unpaid";
 export type PaymentMethod = "cash" | "bank_transfer" | "telebirr" | "cbe_birr" | "cheque" | "other";
@@ -21,6 +23,7 @@ export interface Supplier {
   id: string;
   name: string;
   phones: SupplierPhone[];
+  accounts: PaymentAccount[];
   country: string;
   contactPerson: string | null;
   email: string | null;
@@ -69,6 +72,7 @@ export interface SupplierPayment {
 export interface SupplierInput {
   name: string;
   phones: SupplierPhone[];
+  accounts: PaymentAccountInput[];
   country: string;
   contactPerson: string | null;
   email: string | null;

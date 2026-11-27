@@ -4,12 +4,14 @@ import clsx from "clsx";
 import { Globe2, Lock, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Field, inputClasses } from "@/components/inventory/field";
+import { accountsProblem, PaymentAccountsFields, toAccountForms, toAccountInputs, type AccountForm } from "@/components/payment-accounts/payment-accounts-fields";
 import type { Supplier, SupplierInput, SupplierVisibility } from "@/types/supplier";
 
 /** A supplier while typing */
 export interface SupplierForm {
   name: string;
   phones: { phone: string; label: string }[];
+  accounts: AccountForm[];
   country: string;
   contactPerson: string;
   email: string;
@@ -21,6 +23,7 @@ export interface SupplierForm {
 export const emptySupplierForm = (name = ""): SupplierForm => ({
   name,
   phones: [{ phone: "", label: "" }],
+  accounts: [],
   country: "Ethiopia",
   contactPerson: "",
   email: "",
@@ -32,6 +35,7 @@ export const emptySupplierForm = (name = ""): SupplierForm => ({
 export const toSupplierForm = (supplier: Supplier): SupplierForm => ({
   name: supplier.name,
   phones: supplier.phones.length ? supplier.phones.map((item) => ({ phone: item.phone, label: item.label ?? "" })) : [{ phone: "", label: "" }],
+  accounts: toAccountForms(supplier.accounts),
   country: supplier.country,
   contactPerson: supplier.contactPerson ?? "",
   email: supplier.email ?? "",
@@ -43,6 +47,7 @@ export const toSupplierForm = (supplier: Supplier): SupplierForm => ({
 export const toSupplierInput = (form: SupplierForm): SupplierInput => ({
   name: form.name.trim(),
   phones: form.phones.filter((item) => item.phone.trim()).map((item) => ({ phone: item.phone.trim(), label: item.label.trim() || null })),
+  accounts: toAccountInputs(form.accounts),
   country: form.country.trim(),
   contactPerson: form.contactPerson.trim() || null,
   email: form.email.trim() || null,
@@ -59,7 +64,7 @@ export const supplierProblem = (form: SupplierForm) => {
   if (phones.some((item) => !/^\+?\d{7,15}$/.test(item.phone.replace(/[\s\-().]/g, "")))) return "Enter phone numbers like +251 911 234 567.";
   if (form.country.trim().length < 2) return "Enter the country.";
   if (form.email.trim() && !/^\S+@\S+\.\S+$/.test(form.email.trim())) return "Enter a valid email.";
-  return "";
+  return accountsProblem(form.accounts);
 };
 
 const COUNTRIES = ["Ethiopia", "South Korea", "China", "United Arab Emirates", "Turkey", "India", "Kenya", "Japan", "France", "United States", "United Kingdom", "Italy"];
@@ -187,6 +192,9 @@ export function SupplierFields({ value, onChange, compact }: SupplierFieldsProps
             </Field>
           </div>
           <div className="sm:col-span-2">
+            <PaymentAccountsFields value={value.accounts} onChange={(accounts) => onChange({ accounts })} />
+          </div>
+          <div className="sm:col-span-2">
             <Field label="Notes (optional, only your company sees them)">
               <textarea
                 value={value.notes}
@@ -201,7 +209,7 @@ export function SupplierFields({ value, onChange, compact }: SupplierFieldsProps
         </div>
       ) : (
         <button type="button" onClick={() => setShowMore(true)} className="min-h-9 text-sm font-medium text-brand-700 hover:underline">
-          More details: contact person, email, address, notes
+          More details: contact person, email, address, payment accounts, notes
         </button>
       )}
     </div>

@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Bike,
   Boxes,
   FolderTree,
   LayoutDashboard,
@@ -45,6 +46,7 @@ export const navSections: NavSection[] = [
     title: "Sales",
     items: [
       { label: "Orders", href: "/orders", icon: ShoppingBag, comingSoon: true },
+      { label: "Deliverers", href: "/deliverers", icon: Bike },
       { label: "Discounts", href: "/discounts", icon: Percent, comingSoon: true },
       { label: "Reports", href: "/reports", icon: BarChart3, comingSoon: true },
     ],

@@ -23,6 +23,7 @@ import {
   useRemovePaymentMutation,
 } from "@/store/api/suppliers.api";
 import { paymentMethodLabels, type SupplierDelivery, type SupplierPayment, type SupplierWithMoney } from "@/types/supplier";
+import { PaymentAccountsList } from "@/components/payment-accounts/payment-accounts-list";
 import { PayDialog } from "./pay-dialog";
 import { PaymentBadge } from "./payment-badge";
 
@@ -273,6 +274,10 @@ function Details({ supplier }: { supplier: SupplierWithMoney }) {
             </li>
           )}
         </ul>
+      </div>
+      <div className="space-y-2 sm:col-span-2">
+        <h2 className="text-xs font-semibold tracking-wide text-gray-500 uppercase">Payment accounts</h2>
+        <PaymentAccountsList accounts={supplier.accounts ?? []} />
       </div>
       {supplier.notes && (
         <div className="rounded-lg bg-amber-50 p-3 text-amber-900 sm:col-span-2">
