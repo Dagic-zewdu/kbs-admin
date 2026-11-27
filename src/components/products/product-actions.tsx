@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleDot, Pencil, Power, PowerOff, Trash2 } from "lucide-react";
+import { CircleDot, Eye, Pencil, Power, PowerOff, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -18,11 +18,11 @@ interface ProductActionsProps {
   product: ProductActionTarget;
   onDone: (message: string) => void;
   onDeleted: (name: string) => void;
-  /** Off on the product's own page */
+  /** View and Edit; off on the product's own pages */
   withEdit?: boolean;
 }
 
-/** Edit, change status, activate or deactivate, delete */
+/** View, edit, change status, activate or deactivate, delete */
 export function ProductActions({ product, onDone, onDeleted, withEdit = true }: ProductActionsProps) {
   const router = useRouter();
   const [open, setOpen] = useState<"status" | "toggle" | "delete" | null>(null);
@@ -47,7 +47,8 @@ export function ProductActions({ product, onDone, onDeleted, withEdit = true }: 
   return (
     <>
       <span className="flex items-center gap-0.5">
-        {withEdit && <IconButton icon={Pencil} label={`Edit ${product.name}`} onClick={() => router.push(`/products/${product.id}`)} />}
+        {withEdit && <IconButton icon={Eye} label={`View ${product.name}`} onClick={() => router.push(`/products/${product.id}`)} />}
+        {withEdit && <IconButton icon={Pencil} label={`Edit ${product.name}`} onClick={() => router.push(`/products/${product.id}/edit`)} />}
         <IconButton icon={CircleDot} label={`Change status of ${product.name}`} onClick={() => setOpen("status")} />
         <IconButton
           icon={isInactive ? Power : PowerOff}

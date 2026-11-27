@@ -384,7 +384,7 @@ function ProductFormSteps({ product, barcode = "", storageKey }: { product?: Pro
     }
 
     const changed = then ? await changeStatus({ id, status: then }) : undefined;
-    if (!product) return router.replace(`/products/${id}?${changed?.data ? then : "created"}=1&step=${step}`);
+    if (!product) return router.replace(`/products/${id}/edit?${changed?.data ? then : "created"}=1&step=${step}`);
     if (then && !changed?.data) return;
     setNotice(then === "live" ? "Saved. It's live on the website." : then === "private" ? "Saved. Staff can sell it." : "Saved.");
   };
