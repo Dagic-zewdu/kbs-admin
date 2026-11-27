@@ -411,11 +411,11 @@ function ProductFormSteps({ product, barcode = "", storageKey }: { product?: Pro
   const firstRow = form.variations[0];
   const stepHasMissing = (id: StepId) => missing.some((item) => stepOfMissing[item] === id);
   const canGoLive = product?.status !== "live";
-  // A saved product counts every step as seen
+  // Done = opened and nothing missing to go live
   const stateOf = (id: StepId): StepState => {
     if (id === step) return "current";
     if (stepHasMissing(id)) return "needs";
-    return product || visited.includes(id) ? "done" : "todo";
+    return visited.includes(id) ? "done" : "todo";
   };
 
   return (

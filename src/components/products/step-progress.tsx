@@ -46,7 +46,7 @@ export function StepProgress({ steps, onSelect }: { steps: ProgressStep[]; onSel
                   aria-hidden
                   className={clsx(
                     "absolute top-4 right-1/2 h-0.5 w-full -translate-y-1/2 sm:top-[18px]",
-                    isReached && steps[index - 1].state !== "todo" ? "bg-brand-500" : "bg-gray-200",
+                    isReached && steps[index - 1].state !== "todo" && step.state !== "todo" ? "bg-brand-500" : "bg-gray-200",
                   )}
                 />
               )}
