@@ -1,9 +1,11 @@
 "use client";
 
 import clsx from "clsx";
-import { Boxes, CircleAlert, Check, Pencil } from "lucide-react";
+import { Boxes, CircleAlert, Check, Expand, Pencil, X } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { ZoomImage } from "@/components/photos/zoom-image";
 import { FadeImage } from "@/components/ui/fade-image";
 import { formatDate, formatDay, formatPrice } from "@/lib/labels";
 import { customerPrice, profitOf } from "@/lib/pricing";
@@ -106,6 +108,7 @@ export function ProductDetail({ product }: { product: Product }) {
   const settings = useGetSettingsQuery().data?.data;
   const fields = useListCategoryFieldsQuery(product.category?.id ?? "", { skip: !product.category }).data?.data ?? [];
   const [shown, setShown] = useState(0);
+  const [isLarge, setIsLarge] = useState(false);
   const photo = product.photos[shown] ?? product.photos[0];
   const advisor = product.advisor;
   const name = (key: keyof AdvisorOptions) => namer(options?.[key]);
@@ -143,7 +146,9 @@ export function ProductDetail({ product }: { product: Product }) {
         <Card title="Photos" id="photos" editStep="photos" productId={product.id}>
           {photo ? (
             <div className="space-y-3">
-              <FadeImage src={photo.url} alt={product.name} className="aspect-square w-full rounded-lg border border-gray-100 bg-white" imageClassName="object-contain" />
+              <div className="aspect-square w-full rounded-lg border border-gray-100 bg-white p-1">
+                <ZoomImage key={photo.url} src={photo.url} alt={product.name} wheelZoom={false} />
+              </div>
               {product.photos.length > 1 && (
                 <ul className="flex flex-wrap gap-2">
                   {product.photos.map((item, index) => (
@@ -161,9 +166,20 @@ export function ProductDetail({ product }: { product: Product }) {
                   ))}
                 </ul>
               )}
-              <p className="text-xs text-gray-500">
-                {product.photos.length} of 8 photos · the first one is the main photo
-              </p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-gray-500">
+                  Photo {shown + 1} of {product.photos.length}
+                  {shown === 0 && " · main photo"} · point at it to magnify
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIsLarge(true)}
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  <Expand className="size-4" aria-hidden /> View large
+                </button>
+              </div>
+              {isLarge && <LargePhoto src={photo.url} label={`${product.name} · photo ${shown + 1}`} onClose={() => setIsLarge(false)} />}
             </div>
           ) : (
             <p className="text-sm text-gray-400">No photos yet.</p>
@@ -349,5 +365,40 @@ export function ProductDetail({ product }: { product: Product }) {
         </dl>
       </Card>
     </div>
+  );
+}
+
+/** The photo as big as the screen allows, to zoom into labels and small print */
+function LargePhoto({ src, label, onClose }: { src: string; label: string; onClose: () => void }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (!dialogRef.current?.open) dialogRef.current?.showModal();
+  }, []);
+  return createPortal(
+    <dialog
+      ref={dialogRef}
+      aria-label={label}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+      onClick={(event) => {
+        if (event.target === dialogRef.current) onClose();
+      }}
+      className="m-auto h-dvh max-h-none w-screen max-w-none bg-white p-0 backdrop:bg-gray-900/60 sm:h-[92dvh] sm:w-[calc(100%-2rem)] sm:max-w-4xl sm:rounded-xl"
+    >
+      <div className="flex h-full flex-col gap-3 p-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:p-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="min-w-0 truncate text-base font-semibold text-gray-900">{label}</h2>
+          <button type="button" onClick={onClose} aria-label="Close" className="flex size-10 shrink-0 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100">
+            <X className="size-5" />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1">
+          <ZoomImage src={src} alt={label} />
+        </div>
+      </div>
+    </dialog>,
+    document.body,
   );
 }

@@ -9,8 +9,11 @@ const LENS_ZOOM = 2.5;
 
 type Point = { x: number; y: number };
 
-/** Zoom with buttons, the wheel or two fingers; drag to move. On a computer, the lens magnifies what is under the pointer. */
-export function ZoomImage({ src, alt }: { src: string; alt: string }) {
+/**
+ * Zoom with buttons, the wheel or two fingers; drag to move. On a computer, the lens magnifies what is under the pointer.
+ * wheelZoom off: the wheel scrolls the page, for a photo inside a page.
+ */
+export function ZoomImage({ src, alt, wheelZoom = true }: { src: string; alt: string; wheelZoom?: boolean }) {
   const boxRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState<Point>({ x: 0, y: 0 });
@@ -48,7 +51,9 @@ export function ZoomImage({ src, alt }: { src: string; alt: string }) {
       <div
         ref={boxRef}
         className={`relative min-h-0 flex-1 touch-none select-none overflow-hidden rounded-lg bg-white ${zoom > 1 ? "cursor-grab active:cursor-grabbing" : "cursor-zoom-in"}`}
-        onWheel={(event) => zoomTo(zoom * (event.deltaY < 0 ? 1.2 : 1 / 1.2), { x: event.clientX, y: event.clientY })}
+        onWheel={(event) => {
+          if (wheelZoom) zoomTo(zoom * (event.deltaY < 0 ? 1.2 : 1 / 1.2), { x: event.clientX, y: event.clientY });
+        }}
         onDoubleClick={(event) => zoomTo(zoom > 1 ? 1 : 2.5, { x: event.clientX, y: event.clientY })}
         onPointerDown={(event) => {
           event.currentTarget.setPointerCapture(event.pointerId);
