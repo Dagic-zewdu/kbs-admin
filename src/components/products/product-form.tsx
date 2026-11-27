@@ -1,9 +1,9 @@
 "use client";
 
 import clsx from "clsx";
-import { ArrowLeft, ArrowRight, Check, CircleAlert, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, CircleAlert, CloudCheck, History, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { BarcodeField } from "@/components/barcode/barcode-field";
 import { BrandSelect } from "@/components/brands/brand-select";
 import { CategorySelect } from "@/components/categories/category-select";
@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { RequiredMark } from "@/components/ui/required-mark";
 import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage } from "@/lib/api-error";
+import { useAppSelector } from "@/store/hooks";
 import { formatPrice } from "@/lib/labels";
 import { toNumber } from "@/lib/numbers";
 import { profitOf } from "@/lib/pricing";
@@ -35,7 +36,9 @@ import { AdvisorSection } from "./advisor-section";
 import { IngredientsSection } from "./ingredients-section";
 import { PhotoManager } from "./photo-manager";
 import { PhraseList } from "./phrase-list";
+import { draftKey, readDraft, removeDraft, timeAgo, writeDraft } from "./product-draft";
 import { missingLabels } from "./product-labels";
+import { StepProgress, type StepState } from "./step-progress";
 import { emptyVariation, VariationEditor, type VariationRow } from "./variation-editor";
 
 const toForm = (product?: Product) => ({
@@ -86,6 +89,20 @@ const steps = [
   { id: "review", label: "Review" },
 ] as const;
 type StepId = (typeof steps)[number]["id"];
+const isStep = (value: unknown): value is StepId => steps.some((item) => item.id === value);
+
+/** Shows the step in the address, so a refresh or Back opens it again */
+const showStepInAddress = (id: StepId) => {
+  const url = new URL(window.location.href);
+  url.searchParams.set("step", id);
+  window.history.replaceState(window.history.state, "", url);
+};
+
+/** Rows kept from an earlier visit get fresh keys, so they never clash with new rows */
+const rekey = (form: FormState): FormState => ({
+  ...form,
+  variations: form.variations.map((row, index) => (row.id ? row : { ...row, key: `kept-${Date.now()}-${index}` })),
+});
 
 /** Where each missing thing is filled in */
 const stepOfMissing: Record<string, StepId> = {
@@ -156,14 +173,40 @@ function Section({
   );
 }
 
+const noChange = () => () => {};
+
 /** Create or edit a product, step by step. Saved as a draft at any step; only the name is required. */
-export function ProductForm({ product, barcode = "" }: { product?: Product; barcode?: string }) {
+export function ProductForm(props: { product?: Product; barcode?: string }) {
+  // What is kept on this device is read in the browser only
+  const isBrowser = useSyncExternalStore(noChange, () => true, () => false);
+  const userId = useAppSelector((state) => state.auth.user?.id);
+  if (!isBrowser) return <div className="h-96 animate-pulse rounded-xl border border-gray-200 bg-white" aria-label="Loading" />;
+  return <ProductFormSteps {...props} storageKey={draftKey(userId, props.product?.id)} />;
+}
+
+/** What was kept on this device for this product, if it can still be used */
+const keptFor = (storageKey: string, product: Product | undefined, barcode: string) => {
+  const record = readDraft<FormState>(storageKey);
+  const fromAddress = new URLSearchParams(window.location.search).get("step");
+  const step: StepId = isStep(fromAddress) ? fromAddress : isStep(record?.step) ? record.step : "basics";
+  // A newer save of the product wins; a new scanned code starts a new product
+  const isUsable = record?.form && (product ? record.baseUpdatedAt === product.updatedAt : !barcode || record.form.variations[0]?.barcode === barcode);
+  const visited = (record?.visited ?? []).filter(isStep);
+  return { step, visited, form: isUsable ? rekey(record.form!) : null, savedAt: isUsable ? record.savedAt : null };
+};
+
+function ProductFormSteps({ product, barcode = "", storageKey }: { product?: Product; barcode?: string; storageKey: string }) {
   const router = useRouter();
+  const [kept] = useState(() => keptFor(storageKey, product, barcode));
   const [form, setForm] = useState<FormState>(() => {
+    if (kept.form) return kept.form;
     const start = toForm(product);
     return product || !barcode ? start : { ...start, variations: [{ ...start.variations[0], barcode }] };
   });
-  const [isDirty, setIsDirty] = useState(false);
+  const [isDirty, setIsDirty] = useState(Boolean(kept.form));
+  const [restoredAt, setRestoredAt] = useState(kept.savedAt);
+  // The last save the changes are made on
+  const [baseUpdatedAt, setBaseUpdatedAt] = useState(product?.updatedAt);
   const [isUploading, setIsUploading] = useState(false);
   const [notice, setNotice] = useState("");
   const [localError, setLocalError] = useState("");
@@ -175,11 +218,42 @@ export function ProductForm({ product, barcode = "" }: { product?: Product; barc
   const [changeStatus, statusState] = useChangeProductStatusMutation();
   const isSaving = createState.isLoading || updateState.isLoading || statusState.isLoading;
   const error = createState.error || updateState.error || statusState.error;
-  const [step, setStep] = useState<StepId>("basics");
+  const [step, setStep] = useState<StepId>(kept.step);
+  const [visited, setVisited] = useState<StepId[]>(() => [...new Set([...kept.visited, kept.step])]);
   const stepIndex = steps.findIndex((item) => item.id === step);
   const goTo = (id: StepId) => {
     setStep(id);
+    setVisited((current) => (current.includes(id) ? current : [...current, id]));
     window.scrollTo({ top: 0 });
+  };
+
+  // The open step is in the address and kept on this device
+  useEffect(() => showStepInAddress(step), [step]);
+
+  // Kept on this device a moment after each change, and at once when leaving the page
+  useEffect(() => {
+    const keep = () =>
+      writeDraft(storageKey, {
+        step,
+        visited,
+        form: isDirty ? form : undefined,
+        savedAt: Date.now(),
+        baseUpdatedAt,
+      });
+    const timer = window.setTimeout(keep, 400);
+    window.addEventListener("pagehide", keep);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("pagehide", keep);
+    };
+  }, [form, isDirty, step, visited, storageKey, baseUpdatedAt]);
+
+  const discardKept = () => {
+    setForm(toForm(product));
+    setIsDirty(false);
+    setRestoredAt(null);
+    setNotice("");
+    setLocalError("");
   };
 
   const change = (values: Partial<FormState>) => {
@@ -191,14 +265,6 @@ export function ProductForm({ product, barcode = "" }: { product?: Product; barc
     value: form[key],
     onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => change({ [key]: event.target.value }),
   });
-
-  // Ask before closing the tab with unsaved changes
-  useEffect(() => {
-    if (!isDirty) return;
-    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [isDirty]);
 
   // From the newest form, so two quick changes don't undo each other
   const changeAdvisor = (values: Partial<FormState["advisor"]>) => {
@@ -291,9 +357,16 @@ export function ProductForm({ product, barcode = "" }: { product?: Product; barc
     // New variations now have ids, SKUs and stock: saving again must not add the stock twice
     setForm(toForm(saved.data.data));
     setIsDirty(false);
+    setRestoredAt(null);
+    setBaseUpdatedAt(saved.data.data.updatedAt);
+    if (!product) {
+      // The new product's page opens on the same step; the "new" copy is done
+      removeDraft(storageKey);
+      writeDraft(storageKey.replace(/:new$/, `:${id}`), { step, visited, savedAt: Date.now(), baseUpdatedAt: saved.data.data.updatedAt });
+    }
 
     const changed = then ? await changeStatus({ id, status: then }) : undefined;
-    if (!product) return router.replace(`/products/${id}?${changed?.data ? then : "created"}=1`);
+    if (!product) return router.replace(`/products/${id}?${changed?.data ? then : "created"}=1&step=${step}`);
     if (then && !changed?.data) return;
     setNotice(then === "live" ? "Saved. It's live on the website." : then === "private" ? "Saved. Staff can sell it." : "Saved.");
   };
@@ -338,6 +411,12 @@ export function ProductForm({ product, barcode = "" }: { product?: Product; barc
   const firstRow = form.variations[0];
   const stepHasMissing = (id: StepId) => missing.some((item) => stepOfMissing[item] === id);
   const canGoLive = product?.status !== "live";
+  // A saved product counts every step as seen
+  const stateOf = (id: StepId): StepState => {
+    if (id === step) return "current";
+    if (stepHasMissing(id)) return "needs";
+    return product || visited.includes(id) ? "done" : "todo";
+  };
 
   return (
     <>
@@ -349,34 +428,24 @@ export function ProductForm({ product, barcode = "" }: { product?: Product; barc
         }}
         className="space-y-5"
       >
-        <nav aria-label="Steps" className="scrollbar-none -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-          <ol className="flex gap-1.5">
-            {steps.map((item, index) => (
-              <li key={item.id}>
-                <button
-                  type="button"
-                  aria-current={step === item.id ? "step" : undefined}
-                  onClick={() => goTo(item.id)}
-                  className={clsx(
-                    "flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-sm font-medium",
-                    step === item.id ? "border-brand-600 bg-brand-600 text-white" : "border-gray-200 bg-white text-gray-700 hover:border-brand-300",
-                  )}
-                >
-                  <span className="text-xs opacity-70">{index + 1}</span> {item.label}
-                  {stepHasMissing(item.id) && (
-                    <span className={clsx("size-2 rounded-full", step === item.id ? "bg-white" : "bg-amber-500")} title="Something is needed to go live" />
-                  )}
-                </button>
-              </li>
-            ))}
-          </ol>
-        </nav>
+        <StepProgress steps={steps.map((item) => ({ ...item, state: stateOf(item.id) }))} onSelect={(id) => isStep(id) && goTo(id)} />
 
         <p className="text-xs text-gray-500">
           <span className="text-red-600">*</span> Required before it can be sold or go live. A draft needs only its name.
         </p>
         {(localError || error) && <Alert>{localError || getErrorMessage(error)}</Alert>}
         {notice && <Alert type="success">{notice}</Alert>}
+        {restoredAt && (
+          <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+            <span className="flex items-center gap-2">
+              <History className="size-4 shrink-0" aria-hidden />
+              Your unsaved changes from {timeAgo(restoredAt)} were brought back. Press {product ? "Save changes" : "Save draft"} to keep them.
+            </span>
+            <button type="button" onClick={discardKept} className="min-h-8 font-medium underline">
+              Discard them
+            </button>
+          </div>
+        )}
 
         <Section shown={step === "basics"} title="Basics" description="Scan the barcode first. Only the name is needed to save a draft.">
           {form.variationType === "none" && (
@@ -533,6 +602,11 @@ export function ProductForm({ product, barcode = "" }: { product?: Product; barc
           )}
         </Section>
 
+        {isDirty && (
+          <p className="flex items-center justify-end gap-1.5 text-xs text-gray-500">
+            <CloudCheck className="size-3.5" aria-hidden /> Changes kept on this device. Press {product ? "Save changes" : "Save draft"} to save them for everyone.
+          </p>
+        )}
         <div className="flex flex-col gap-2 rounded-xl border border-gray-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="grid grid-cols-2 gap-2 sm:flex">
             <Button type="button" variant="secondary" disabled={stepIndex === 0} onClick={() => goTo(steps[stepIndex - 1].id)}>
@@ -549,7 +623,7 @@ export function ProductForm({ product, barcode = "" }: { product?: Product; barc
               </Button>
             )}
             <Button type="button" variant="ghost" onClick={() => router.push("/products")}>
-              {isDirty ? "Cancel" : "Back to products"}
+              Back to products
             </Button>
             <Button type="submit" isLoading={isSaving} disabled={isUploading}>
               {product ? "Save changes" : "Save draft"}
