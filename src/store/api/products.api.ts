@@ -29,11 +29,11 @@ export const productsApi = baseApi.injectEndpoints({
     }),
     createProduct: build.mutation<ApiResponse<Product>, SaveProductRequest>({
       query: (body) => ({ url: "/admin/products", method: "POST", body }),
-      invalidatesTags: ["Products", "Inventory"],
+      invalidatesTags: ["Products", "Inventory", "Suppliers"],
     }),
     updateProduct: build.mutation<ApiResponse<Product>, SaveProductRequest & { id: string }>({
       query: ({ id, ...body }) => ({ url: `/admin/products/${id}`, method: "PATCH", body }),
-      invalidatesTags: (_result, _error, { id }) => ["Products", "Inventory", { type: "Product", id }],
+      invalidatesTags: (_result, _error, { id }) => ["Products", "Inventory", "Suppliers", { type: "Product", id }],
     }),
     /** Draft, private, live or inactive */
     changeProductStatus: build.mutation<ApiResponse<Product>, { id: string; status: ProductStatus }>({

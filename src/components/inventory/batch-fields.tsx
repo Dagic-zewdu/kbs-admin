@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { ExpiryField } from "@/components/expiry/expiry-field";
-import { RequiredMark } from "@/components/ui/required-mark";
 import { wholeText } from "@/lib/numbers";
+import { DeliveryPaymentFields, emptyDeliveryPayment, toDeliveryPayment, type DeliveryPaymentForm } from "@/components/suppliers/delivery-payment-fields";
 import type { BatchDetails, ReceiveBatch } from "@/types/inventory";
+import { Field, inputClasses } from "./field";
 
 /** A batch while typing */
 export interface BatchForm {
@@ -12,9 +13,11 @@ export interface BatchForm {
   expiryDate: string;
   batchNumber: string;
   manufacturingDate: string;
+  /** Who delivered it and what is paid. Only for new stock. */
+  payment: DeliveryPaymentForm;
 }
 
-export const emptyBatch: BatchForm = { quantity: "", expiryDate: "", batchNumber: "", manufacturingDate: "" };
+export const emptyBatch: BatchForm = { quantity: "", expiryDate: "", batchNumber: "", manufacturingDate: "", payment: emptyDeliveryPayment };
 
 export const toBatchDetails = (form: BatchForm): BatchDetails => ({
   batchNumber: form.batchNumber.trim() || null,
@@ -22,22 +25,9 @@ export const toBatchDetails = (form: BatchForm): BatchDetails => ({
   manufacturingDate: form.manufacturingDate || null,
 });
 
-export const toReceiveBatch = (form: BatchForm): ReceiveBatch => ({ quantity: Number(form.quantity), ...toBatchDetails(form) });
+export const toReceiveBatch = (form: BatchForm): ReceiveBatch => ({ quantity: Number(form.quantity), ...toBatchDetails(form), ...toDeliveryPayment(form.payment) });
 
-export const inputClasses =
-  "h-11 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 sm:h-10";
-
-export function Field({ label, isRequired, children }: { label: string; isRequired?: boolean; children: React.ReactNode }) {
-  return (
-    <label className="block space-y-1.5">
-      <span className="block text-sm font-medium text-gray-700">
-        {label}
-        {isRequired && <RequiredMark />}
-      </span>
-      {children}
-    </label>
-  );
-}
+export { Field, inputClasses } from "./field";
 
 interface BatchFieldsProps {
   value: BatchForm;
@@ -47,10 +37,12 @@ interface BatchFieldsProps {
   withQuantity?: boolean;
   /** Shown right after quantity and expiry, e.g. the prices */
   children?: React.ReactNode;
+  /** Cost of one unit, for the supplier's total */
+  unitCost?: number | null;
 }
 
 /** Quantity and expiry first; the rest under "More" */
-export function BatchFields({ value, onChange, expiryRequired, withQuantity = true, children }: BatchFieldsProps) {
+export function BatchFields({ value, onChange, expiryRequired, withQuantity = true, children, unitCost = null }: BatchFieldsProps) {
   const [showMore, setShowMore] = useState(!withQuantity || Boolean(value.batchNumber || value.manufacturingDate));
   return (
     <div className="space-y-3">
@@ -98,6 +90,14 @@ export function BatchFields({ value, onChange, expiryRequired, withQuantity = tr
         <button type="button" onClick={() => setShowMore(true)} className="min-h-9 text-sm font-medium text-brand-700 hover:underline">
           More: batch number, made on
         </button>
+      )}
+      {withQuantity && (
+        <DeliveryPaymentFields
+          value={value.payment ?? emptyDeliveryPayment}
+          onChange={(change) => onChange({ payment: { ...(value.payment ?? emptyDeliveryPayment), ...change } })}
+          quantity={value.quantity}
+          unitCost={unitCost}
+        />
       )}
     </div>
   );

@@ -8,6 +8,7 @@ import { BarcodeField } from "@/components/barcode/barcode-field";
 import { BrandSelect } from "@/components/brands/brand-select";
 import { CategorySelect } from "@/components/categories/category-select";
 import { emptyBatch, toReceiveBatch } from "@/components/inventory/batch-fields";
+import { deliveryPaymentProblem, deliveryTotal, emptyDeliveryPayment } from "@/components/suppliers/delivery-payment-fields";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -101,7 +102,11 @@ const showStepInAddress = (id: StepId) => {
 /** Rows kept from an earlier visit get fresh keys, so they never clash with new rows */
 const rekey = (form: FormState): FormState => ({
   ...form,
-  variations: form.variations.map((row, index) => (row.id ? row : { ...row, key: `kept-${Date.now()}-${index}` })),
+  // Kept before suppliers existed: the new stock gets an empty supplier and payment
+  variations: form.variations.map((row, index) => {
+    const newBatch = { ...emptyBatch, ...row.newBatch, payment: { ...emptyDeliveryPayment, ...row.newBatch?.payment } };
+    return row.id ? { ...row, newBatch } : { ...row, newBatch, key: `kept-${Date.now()}-${index}` };
+  }),
 });
 
 /** Where each missing thing is filled in */
@@ -284,12 +289,18 @@ function ProductFormSteps({ product, barcode = "", storageKey }: { product?: Pro
       if (row.compareAtPrice && !(Number(row.compareAtPrice) > Number(row.price))) {
         return { step: "variations", message: "The old selling price must be higher than the selling price." };
       }
-      const { quantity, ...details } = row.newBatch;
-      if (!Number(quantity) && Object.values(details).some(Boolean)) {
+      const { quantity, payment, ...details } = row.newBatch;
+      if (!Number(quantity) && (Object.values(details).some(Boolean) || payment.supplier || payment.paymentStatus)) {
         return { step: "variations", message: "Enter the quantity of the new stock." };
       }
       if (Number(quantity) > 0 && expiryRequired && !details.expiryDate) {
         return { step: "variations", message: "Enter the expiry date of the new stock." };
+      }
+      if (Number(quantity) > 0) {
+        const cost = toNumber(row.costPrice);
+        if (cost === null) return { step: "variations", message: "Enter the cost price: the supplier is paid quantity × cost price." };
+        const paymentProblem = deliveryPaymentProblem(payment, deliveryTotal(quantity, cost));
+        if (paymentProblem) return { step: "variations", message: paymentProblem };
       }
     }
     return null;

@@ -12,6 +12,7 @@ import { useGetSettingsQuery } from "@/store/api/settings.api";
 import type { AdjustBatch, Batch, ReduceReason, VariationStockDetail } from "@/types/inventory";
 import { BatchFields, emptyBatch, Field, inputClasses, toBatchDetails, toReceiveBatch, type BatchForm } from "./batch-fields";
 import { FormDialog } from "./form-dialog";
+import { deliveryPaymentProblem, deliveryTotal, emptyDeliveryPayment } from "@/components/suppliers/delivery-payment-fields";
 
 interface DoneProps {
   onClose: () => void;
@@ -64,6 +65,8 @@ export function IncreaseDialog({ variationId, expiryRequired, now, onHand, onClo
     if (expiryRequired && !form.expiryDate) return setLocalError("Enter the expiry date from the package.");
     if (cost === null || !Number.isFinite(cost)) return setLocalError("Enter the cost price of one unit.");
     if (price === null || !(price > 0)) return setLocalError("Enter the selling price of one unit.");
+    const paymentProblem = deliveryPaymentProblem(form.payment, deliveryTotal(form.quantity, cost));
+    if (paymentProblem) return setLocalError(paymentProblem);
     setLocalError("");
     const result = await receive({ variationId, ...toReceiveBatch(form), barcode: code, addBarcode: isNew || undefined, unitCost: cost, unitPrice: price });
     if (result.data) onDone(`${form.quantity} units were added.`, result.data.data);
@@ -121,7 +124,7 @@ export function IncreaseDialog({ variationId, expiryRequired, now, onHand, onClo
           </label>
         )}
       </div>
-      <BatchFields value={form} onChange={(change) => typing(() => setForm({ ...form, ...change }))} expiryRequired={expiryRequired}>
+      <BatchFields value={form} onChange={(change) => typing(() => setForm({ ...form, ...change }))} expiryRequired={expiryRequired} unitCost={cost}>
         <Field label="Cost price of one unit, ETB" isRequired>
           <input
             inputMode="decimal"
@@ -158,6 +161,7 @@ export function EditBatchDialog({ batch, expiryRequired, onClose, onDone }: Done
     expiryDate: batch.expiryDate ?? "",
     batchNumber: batch.batchNumber ?? "",
     manufacturingDate: batch.manufacturingDate ?? "",
+    payment: emptyDeliveryPayment,
   });
   const [costText, setCostText] = useState(batch.unitCost === null ? "" : String(batch.unitCost));
   const [update, { isLoading, error }] = useUpdateBatchMutation();

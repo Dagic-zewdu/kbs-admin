@@ -17,6 +17,9 @@ import { useGetVariationStockQuery } from "@/store/api/inventory.api";
 import type { Batch, StockMovement } from "@/types/inventory";
 import { PrintLabelsDialog } from "./print-labels-dialog";
 import { AdjustDialog, DecreaseDialog, EditBatchDialog, IncreaseDialog } from "./stock-dialogs";
+import { PayDialog } from "@/components/suppliers/pay-dialog";
+import { PaymentBadge } from "@/components/suppliers/payment-badge";
+import { usePayDeliveryMutation } from "@/store/api/suppliers.api";
 
 const movementLabels: Record<StockMovement["type"], string> = {
   received: "Received",
@@ -26,7 +29,7 @@ const movementLabels: Record<StockMovement["type"], string> = {
   corrected: "Counted again",
 };
 
-type OpenDialog = { type: "receive" | "reduce" | "labels" } | { type: "edit" | "adjust"; batch: Batch } | null;
+type OpenDialog = { type: "receive" | "reduce" | "labels" } | { type: "edit" | "adjust" | "pay"; batch: Batch } | null;
 
 /** One variation: its batches and what happened to its stock */
 export function VariationStockView({ id }: { id: string }) {
@@ -34,6 +37,7 @@ export function VariationStockView({ id }: { id: string }) {
   const settings = useGetSettingsQuery().data?.data;
   const [dialog, setDialog] = useState<OpenDialog>(null);
   const [notice, setNotice] = useState("");
+  const [payDelivery, payState] = usePayDeliveryMutation();
 
   if (isLoading) return <Loader2 className="mx-auto mt-16 size-6 animate-spin text-brand-600" aria-label="Loading" />;
   if (!data) return <p className="py-16 text-center text-sm text-red-600">{getErrorMessage(error) || "Not found"}</p>;
@@ -114,6 +118,21 @@ export function VariationStockView({ id }: { id: string }) {
                     .filter(Boolean)
                     .join(" · ")}
                 </p>
+                <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-600">
+                  {batch.supplier ? (
+                    <Link href={`/suppliers/${batch.supplier.id}`} className="font-medium text-brand-700 hover:underline">
+                      From {batch.supplier.name}
+                    </Link>
+                  ) : (
+                    <span className="text-gray-400">Supplier not recorded</span>
+                  )}
+                  {batch.payment && <PaymentBadge payment={batch.payment} />}
+                  {batch.payment && batch.payment.left > 0 && (
+                    <button type="button" onClick={() => setDialog({ type: "pay", batch })} className="min-h-7 font-medium text-brand-700 hover:underline">
+                      Pay
+                    </button>
+                  )}
+                </p>
               </div>
               <div className="flex items-center gap-1">
                 <span className="mr-2 whitespace-nowrap text-gray-900">
@@ -183,6 +202,23 @@ export function VariationStockView({ id }: { id: string }) {
       {dialog?.type === "reduce" && <DecreaseDialog variationId={id} onHand={stock.onHand} expired={stock.expired} onClose={close} onDone={done} />}
       {dialog?.type === "edit" && <EditBatchDialog batch={dialog.batch} expiryRequired={expiryRequired} onClose={close} onDone={done} />}
       {dialog?.type === "adjust" && <AdjustDialog batch={dialog.batch} onClose={close} onDone={done} />}
+      {dialog?.type === "pay" && dialog.batch.payment && (
+        <PayDialog
+          title={`Pay ${dialog.batch.supplier?.name ?? "the supplier"}`}
+          owed={dialog.batch.payment.left}
+          hint={`For the ${dialog.batch.quantityReceived} units received ${formatDay(dialog.batch.receivedDate)}.`}
+          isLoading={payState.isLoading}
+          error={payState.error}
+          onClose={() => {
+            payState.reset();
+            close();
+          }}
+          onPay={async (payment) => {
+            const result = await payDelivery({ batchId: dialog.batch.id, ...payment });
+            if (result.data) done(`${formatPrice(payment.amount)} paid to ${dialog.batch.supplier?.name ?? "the supplier"}.`);
+          }}
+        />
+      )}
     </div>
   );
 }

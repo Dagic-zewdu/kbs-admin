@@ -350,7 +350,12 @@ function Quantity({ row, onChange, onStockChange, expiryRequired }: Pick<Variati
       ) : (
         <>
           <p className="text-sm font-semibold text-gray-900">Quantity in stock</p>
-          <BatchFields value={row.newBatch} expiryRequired={expiryRequired} onChange={(change) => onChange({ newBatch: { ...row.newBatch, ...change } })} />
+          <BatchFields
+            value={row.newBatch}
+            expiryRequired={expiryRequired}
+            unitCost={toNumber(row.costPrice)}
+            onChange={(change) => onChange({ newBatch: { ...row.newBatch, ...change } })}
+          />
         </>
       )}
     </fieldset>

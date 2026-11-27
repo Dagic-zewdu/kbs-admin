@@ -17,7 +17,7 @@ export const inventoryApi = baseApi.injectEndpoints({
     }),
     receiveBatch: build.mutation<ApiResponse<VariationStockDetail>, ReceiveStock & { variationId: string }>({
       query: ({ variationId, ...body }) => ({ url: `/admin/inventory/variations/${variationId}/batches`, method: "POST", body }),
-      invalidatesTags: ["Inventory", "Products", "Product"],
+      invalidatesTags: ["Inventory", "Products", "Product", "Suppliers"],
     }),
     /** Takes the units that expire first */
     reduceStock: build.mutation<ApiResponse<VariationStockDetail>, ReduceStock & { variationId: string }>({
@@ -46,7 +46,7 @@ export const inventoryApi = baseApi.injectEndpoints({
     }),
     updateBatch: build.mutation<ApiResponse<VariationStockDetail>, BatchDetails & { id: string }>({
       query: ({ id, ...body }) => ({ url: `/admin/inventory/batches/${id}`, method: "PATCH", body }),
-      invalidatesTags: ["Inventory", "Products", "Product"],
+      invalidatesTags: ["Inventory", "Products", "Product", "Suppliers"],
     }),
     adjustBatch: build.mutation<ApiResponse<VariationStockDetail>, AdjustBatch & { id: string }>({
       query: ({ id, ...body }) => ({ url: `/admin/inventory/batches/${id}/adjust`, method: "POST", body }),

@@ -1,4 +1,5 @@
 import type { ProductStatus } from "./product";
+import type { DeliveryMoney, PaymentMethod, PaymentStatus } from "./supplier";
 
 export interface VariationStock {
   /** Units that can be sold (not expired) */
@@ -57,6 +58,9 @@ export interface Batch {
   unitCost: number | null;
   /** The selling price set with this delivery */
   unitPrice: number | null;
+  /** null for stock added before suppliers existed */
+  supplier: { id: string; name: string } | null;
+  payment: DeliveryMoney | null;
   receivedDate: string;
 }
 
@@ -93,7 +97,16 @@ export interface BatchDetails {
   unitPrice?: number | null;
 }
 
-export type ReceiveBatch = BatchDetails & { quantity: number };
+/** Who delivered it and what was paid now. Total = quantity × cost price. */
+export interface DeliveryPayment {
+  supplierId: string;
+  paymentStatus: PaymentStatus;
+  amountPaid: number | null;
+  paymentMethod: PaymentMethod | null;
+  payByDate: string | null;
+}
+
+export type ReceiveBatch = BatchDetails & DeliveryPayment & { quantity: number };
 export type ReceiveStock = ReceiveBatch & { barcode: string; addBarcode?: boolean };
 
 /** Why units are taken out of stock */
