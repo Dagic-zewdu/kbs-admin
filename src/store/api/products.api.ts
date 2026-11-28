@@ -1,7 +1,7 @@
 import type { ApiResponse, PaginatedResult } from "@/types/auth";
 import type { AdvisorOptions, IngredientAnalysis, ProductIngredient } from "@/types/advisor";
 import type { UploadedFile } from "@/types/file";
-import type { CategoryField, Product, ProductStatus, ProductSummary, SaveProductRequest } from "@/types/product";
+import type { BulkProductsResult, CategoryField, Product, ProductStatus, ProductSummary, SaveProductRequest } from "@/types/product";
 import { baseApi } from "./base-api";
 
 export interface ListProductsRequest {
@@ -48,6 +48,11 @@ export const productsApi = baseApi.injectEndpoints({
     createInternalBarcode: build.mutation<ApiResponse<{ barcode: string }>, void>({
       query: () => ({ url: "/admin/products/internal-barcode", method: "POST" }),
     }),
+    /** Many products at once; each is done on its own, the ones that can't come back in failed */
+    bulkProducts: build.mutation<ApiResponse<BulkProductsResult>, { ids: string[]; action: "status"; status: ProductStatus } | { ids: string[]; action: "delete" }>({
+      query: (body) => ({ url: "/admin/products/bulk", method: "POST", body }),
+      invalidatesTags: ["Products", "Inventory", "Product"],
+    }),
     deleteProduct: build.mutation<ApiResponse<null>, string>({
       query: (id) => ({ url: `/admin/products/${id}`, method: "DELETE" }),
       invalidatesTags: ["Products", "Inventory"],
@@ -92,6 +97,7 @@ export const {
   useCreateProductMutation,
   useUpdateProductMutation,
   useDeleteProductMutation,
+  useBulkProductsMutation,
   useChangeProductStatusMutation,
   useGetProductByBarcodeQuery,
   useCreateInternalBarcodeMutation,

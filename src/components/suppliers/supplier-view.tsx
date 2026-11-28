@@ -26,6 +26,7 @@ import type { SupplierDelivery, SupplierPayment, SupplierWithMoney } from "@/typ
 import { PaymentAccountsList } from "@/components/payment-accounts/payment-accounts-list";
 import { PayDialog } from "./pay-dialog";
 import { PaymentBadge } from "./payment-badge";
+import { PlatformBadge } from "./platform-badge";
 
 type Dialog = { type: "pay" } | { type: "payDelivery"; delivery: SupplierDelivery } | { type: "remove"; payment: SupplierPayment } | { type: "status" } | { type: "delete" } | null;
 
@@ -77,7 +78,12 @@ export function SupplierView({ id }: { id: string }) {
       {notice && <Alert type="success">{notice}</Alert>}
 
       <div className="flex flex-wrap gap-2">
-        {supplier.visibility === "shared" ? (
+        {supplier.createdBy === "platform" ? (
+          <>
+            <PlatformBadge size="md" />
+            <span className="self-center text-xs text-gray-500">You can use and pay it. Only the platform can change it.</span>
+          </>
+        ) : supplier.visibility === "shared" ? (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-800">
             <Globe2 className="size-3.5" aria-hidden /> {isMine ? "Shared with other companies" : "Shared by another company"}
           </span>

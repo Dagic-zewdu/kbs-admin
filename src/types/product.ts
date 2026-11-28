@@ -110,3 +110,9 @@ export interface SaveProductRequest {
 }
 
 export const MAX_PHOTOS = 8;
+
+/** What a bulk action did: done ones (status null = deleted) and the ones it couldn't, with the reason */
+export interface BulkProductsResult {
+  done: { id: string; name: string; status: ProductStatus | null }[];
+  failed: { id: string; name: string | null; code: string; message: string }[];
+}

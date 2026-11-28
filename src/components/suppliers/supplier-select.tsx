@@ -10,6 +10,7 @@ import { getErrorMessage } from "@/lib/api-error";
 import { useCreateSupplierMutation, useSearchSuppliersQuery } from "@/store/api/suppliers.api";
 import type { Supplier } from "@/types/supplier";
 import { emptySupplierForm, SupplierFields, supplierProblem, toSupplierInput, type SupplierForm } from "./supplier-fields";
+import { PlatformBadge } from "./platform-badge";
 
 interface SupplierSelectProps {
   value: Supplier | null;
@@ -48,7 +49,7 @@ export function SupplierSelect({ value, onChange }: SupplierSelectProps) {
           <span className="min-w-0 flex-1 text-sm">
             <span className="block truncate font-medium text-gray-900">{value.name}</span>
             <span className="block truncate text-gray-500">
-              {[value.phones[0]?.phone, value.country, value.createdBy === "company" && "Shared"].filter(Boolean).join(" · ")}
+              {[value.phones[0]?.phone, value.country, value.createdBy === "company" && "Shared", value.createdBy === "platform" && "From the platform"].filter(Boolean).join(" · ")}
             </span>
           </span>
           <button type="button" onClick={() => onChange(null)} className="min-h-9 shrink-0 rounded-lg px-2.5 text-sm font-medium text-brand-700 hover:bg-brand-50">
@@ -122,6 +123,7 @@ export function SupplierSelect({ value, onChange }: SupplierSelectProps) {
                   <Globe2 className="size-3" aria-hidden /> Shared
                 </span>
               )}
+              {supplier.createdBy === "platform" && <PlatformBadge />}
             </button>
           ))}
           <button

@@ -1,5 +1,6 @@
 "use client";
 
+import clsx from "clsx";
 import { Loader2, Package, Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -15,7 +16,8 @@ import { formatDate, formatPrice } from "@/lib/labels";
 import { useListCategoriesQuery } from "@/store/api/categories.api";
 import { useListProductsQuery, type ListProductsRequest } from "@/store/api/products.api";
 import { categoryPath } from "@/types/category";
-import type { ProductStatus, ProductSummary } from "@/types/product";
+import type { BulkProductsResult, ProductStatus, ProductSummary } from "@/types/product";
+import { BulkActions } from "./bulk-actions";
 import { ProductActions } from "./product-actions";
 import { ProductStatusBadge, statusLabels } from "./product-labels";
 
@@ -36,6 +38,10 @@ const variationText = ({ variationType, variationsCount }: ProductSummary) =>
   variationType === "none" ? null : `${variationsCount} ${variationType}${variationsCount === 1 ? "" : "s"}`;
 
 const SHOWN_CODES = 2;
+
+/** Draft and inactive can't be sold: shown faded so they are easy to spot */
+const isUnsellable = (product: ProductSummary) => product.status === "draft" || product.status === "inactive";
+const checkboxClasses = "size-5 cursor-pointer rounded border-gray-300 accent-brand-600";
 
 /** SKU and barcode of each variation */
 function Codes({ product }: { product: ProductSummary }) {
@@ -66,11 +72,30 @@ export function ProductsView() {
   const [categoryId, setCategoryId] = useState("");
   const [sort, setSort] = useState<ListProductsRequest["sort"]>("newest");
   const [page, setPage] = useState(1);
+  // Selection is per page: it clears when the page or the filters change
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [failed, setFailed] = useState<BulkProductsResult["failed"]>([]);
   const search = useDebouncedValue(searchText.trim());
   const categories = useListCategoriesQuery();
   const { data, isLoading, isFetching, error } = useListProductsQuery({ page, limit: PAGE_SIZE, search, status, categoryId, sort });
   const result = data?.data;
   const isFiltered = Boolean(search) || status !== "all" || Boolean(categoryId);
+  const items = result?.items ?? [];
+  const selected = items.filter((product) => selectedIds.has(product.id));
+  const allSelected = items.length > 0 && selected.length === items.length;
+  const clearSelection = () => setSelectedIds(new Set());
+  const toggle = (id: string) =>
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const toggleAll = () => setSelectedIds(allSelected ? new Set() : new Set(items.map((product) => product.id)));
+  const changePage = (next: number) => {
+    setPage(next);
+    clearSelection();
+  };
 
   const actions = (product: ProductSummary) => (
     <ProductActions product={product} onDone={setNotice} onDeleted={(name) => setNotice(`${name} was deleted.`)} />
@@ -94,6 +119,34 @@ export function ProductsView() {
           </>
         } />
       {notice && <Alert type="success">{notice}</Alert>}
+      {failed.length > 0 && (
+        <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
+          <p className="font-medium">
+            {failed.length === 1 ? "1 product wasn't changed" : `${failed.length} products weren't changed`} (still selected):
+          </p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-5">
+            {failed.map((item) => (
+              <li key={item.id}>
+                <strong className="font-medium">{item.name ?? "A product"}</strong>: {item.message}
+              </li>
+            ))}
+          </ul>
+          <button type="button" onClick={() => setFailed([])} className="mt-1 text-sm font-medium underline">
+            Hide
+          </button>
+        </div>
+      )}
+      {selected.length > 0 && (
+        <BulkActions
+          selected={selected}
+          onClear={clearSelection}
+          onFinished={(message, notDone) => {
+            setNotice(message);
+            setFailed(notDone);
+            setSelectedIds(new Set(notDone.map((item) => item.id)));
+          }}
+        />
+      )}
 
       <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-[1fr_9rem_14rem_9rem]">
         <label className="relative sm:col-span-3 lg:col-span-1">
@@ -104,7 +157,7 @@ export function ProductsView() {
             value={searchText}
             onChange={(event) => {
               setSearchText(event.target.value);
-              setPage(1);
+              changePage(1);
             }}
             placeholder="Search by name, brand, barcode or SKU"
             className={`${fieldClasses} pl-9 pr-3`}
@@ -115,7 +168,7 @@ export function ProductsView() {
           value={status}
           onChange={(event) => {
             setStatus(event.target.value as typeof status);
-            setPage(1);
+            changePage(1);
           }}
           className={`${fieldClasses} px-3`}
         >
@@ -131,7 +184,7 @@ export function ProductsView() {
           value={categoryId}
           onChange={(event) => {
             setCategoryId(event.target.value);
-            setPage(1);
+            changePage(1);
           }}
           className={`${fieldClasses} px-3`}
         >
@@ -147,7 +200,7 @@ export function ProductsView() {
           value={sort}
           onChange={(event) => {
             setSort(event.target.value as typeof sort);
-            setPage(1);
+            changePage(1);
           }}
           className={`${fieldClasses} px-3`}
         >
@@ -171,8 +224,15 @@ export function ProductsView() {
           <>
             <ul className="divide-y divide-gray-100 md:hidden">
               {result.items.map((product) => (
-                <li key={product.id}>
-                  <Link href={`/products/${product.id}`} className="flex gap-3 px-4 pb-2 pt-4 active:bg-brand-50/40">
+                <li key={product.id} className={clsx("relative", selectedIds.has(product.id) && "bg-brand-50/60")}>
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(product.id)}
+                    onChange={() => toggle(product.id)}
+                    aria-label={`Select ${product.name}`}
+                    className={clsx(checkboxClasses, "absolute left-4 top-[1.4rem] z-10")}
+                  />
+                  <Link href={`/products/${product.id}`} className={clsx("flex gap-3 pb-2 pl-12 pr-4 pt-4 active:bg-brand-50/40", isUnsellable(product) && "opacity-55")}>
                     <MainPhoto product={product} className="size-16" />
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex items-start justify-between gap-2">
@@ -197,6 +257,9 @@ export function ProductsView() {
               <table className="w-full text-left text-sm">
                 <thead className="border-b border-gray-100 bg-gray-50/60 text-xs uppercase tracking-wide text-gray-500">
                   <tr>
+                    <th className="w-10 py-3 pl-4">
+                      <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Select every product on this page" className={checkboxClasses} />
+                    </th>
                     <th className="px-4 py-3 font-medium">Product</th>
                     <th className="px-4 py-3 font-medium">SKU · Barcode</th>
                     <th className="hidden px-4 py-3 font-medium xl:table-cell">Category</th>
@@ -209,7 +272,18 @@ export function ProductsView() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {result.items.map((product) => (
-                    <tr key={product.id} className="hover:bg-brand-50/30">
+                    <tr
+                      key={product.id}
+                      className={clsx(
+                        "hover:bg-brand-50/30",
+                        selectedIds.has(product.id) && "bg-brand-50/60",
+                        // Faded content (not the checkbox and the actions)
+                        isUnsellable(product) && "[&>td:not(:first-child):not(:last-child)]:opacity-55",
+                      )}
+                    >
+                      <td className="py-3 pl-4">
+                        <input type="checkbox" checked={selectedIds.has(product.id)} onChange={() => toggle(product.id)} aria-label={`Select ${product.name}`} className={checkboxClasses} />
+                      </td>
                       <td className="max-w-64 px-4 py-3">
                         <Link href={`/products/${product.id}`} className="flex items-center gap-3">
                           <MainPhoto product={product} className="size-12" />
@@ -240,7 +314,7 @@ export function ProductsView() {
                 </tbody>
               </table>
             </div>
-            <Pagination page={result.page} totalPages={result.totalPages} total={result.total} limit={result.limit} onPageChange={setPage} />
+            <Pagination page={result.page} totalPages={result.totalPages} total={result.total} limit={result.limit} onPageChange={changePage} />
           </>
         )}
       </section>

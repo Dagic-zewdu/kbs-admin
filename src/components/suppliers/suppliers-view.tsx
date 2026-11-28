@@ -13,6 +13,7 @@ import { getErrorMessage } from "@/lib/api-error";
 import { formatDay, formatPrice } from "@/lib/labels";
 import { useListSuppliersQuery } from "@/store/api/suppliers.api";
 import type { SupplierFilter } from "@/types/supplier";
+import { PlatformBadge } from "./platform-badge";
 
 const PAGE_SIZE = 20;
 
@@ -22,6 +23,7 @@ const filters: { value: SupplierFilter; label: string }[] = [
   { value: "overdue", label: "Overdue" },
   { value: "mine", label: "Created by us" },
   { value: "shared", label: "Shared by others" },
+  { value: "platform", label: "From the platform" },
   { value: "inactive", label: "Deactivated" },
 ];
 
@@ -126,10 +128,14 @@ export function SuppliersView() {
                     <span className="min-w-0 flex-1">
                       <span className="flex flex-wrap items-center gap-2">
                         <span className="truncate font-medium text-gray-900">{supplier.name}</span>
-                        {supplier.visibility === "shared" && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-800">
-                            <Globe2 className="size-3" aria-hidden /> {supplier.createdBy === "us" ? "Shared" : "Shared by another company"}
-                          </span>
+                        {supplier.createdBy === "platform" ? (
+                          <PlatformBadge />
+                        ) : (
+                          supplier.visibility === "shared" && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-800">
+                              <Globe2 className="size-3" aria-hidden /> {supplier.createdBy === "us" ? "Shared" : "Shared by another company"}
+                            </span>
+                          )
                         )}
                         {!supplier.isActive && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">Deactivated</span>}
                       </span>

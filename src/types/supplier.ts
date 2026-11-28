@@ -32,8 +32,8 @@ export interface Supplier {
   notes: string | null;
   visibility: SupplierVisibility;
   isActive: boolean;
-  /** company = shared by another company */
-  createdBy: "us" | "company";
+  /** company = shared by another company. platform = added by the platform: we use and pay it, only the platform changes it */
+  createdBy: "us" | "company" | "platform";
   createdAt: string;
 }
 
@@ -88,7 +88,7 @@ export interface PaymentInput {
   note: string | null;
 }
 
-export type SupplierFilter = "all" | "owe" | "overdue" | "mine" | "shared" | "inactive";
+export type SupplierFilter = "all" | "owe" | "overdue" | "mine" | "shared" | "platform" | "inactive";
 
 export const paymentStatusLabels: Record<PaymentStatus, string> = {
   paid: "Paid",
