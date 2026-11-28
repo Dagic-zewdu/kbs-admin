@@ -233,9 +233,14 @@ export function SalesView() {
                         {[
                           formatTime(sale.soldAt),
                           sale.customer.name,
-                          sale.channel?.name && (sale.fromLive ? `${sale.channel.name} live` : sale.channel.name),
+                          sale.channel?.name,
+                          sale.fromLive && "came from a live",
                           sale.contactedAt && `contacted ${formatTime(sale.contactedAt)}`,
-                          `${sale.units} ${sale.units === 1 ? "unit" : "units"}`, sale.seller?.name].filter(Boolean).join(" · ")}
+                          `${sale.units} ${sale.units === 1 ? "unit" : "units"}`,
+                          sale.seller?.name,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
                       </span>
                     </span>
                     <span className="shrink-0 text-right text-sm">
@@ -272,7 +277,7 @@ export function SalesView() {
                   {result.items.map((sale) => (
                     <tr key={sale.id} className={clsx("hover:bg-gray-50", sale.status === "cancelled" && "text-gray-400")}>
                       <td className="px-4 py-3">
-                        <Link href={`/sales/${sale.id}`} className="font-medium text-gray-900 hover:text-brand-700 hover:underline">
+                        <Link href={`/sales/${sale.id}`} className="font-medium whitespace-nowrap text-gray-900 hover:text-brand-700 hover:underline">
                           {sale.code}
                         </Link>
                         {sale.status !== "completed" && (

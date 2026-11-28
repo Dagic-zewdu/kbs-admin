@@ -62,7 +62,8 @@ export function SaleView({ id }: { id: string }) {
         title={`Sale ${sale.code}`}
         description={[
           `Sold ${formatTime(sale.soldAt)}`,
-          sale.channel?.name && (sale.fromLive ? `${sale.channel.name} live` : sale.channel.name),
+          sale.channel?.name,
+          sale.fromLive && "came from a live",
           sale.contactedAt && `Contacted ${formatTime(sale.contactedAt)}`,
           sale.seller?.name && `by ${sale.seller.name}`,
         ]

@@ -630,7 +630,7 @@ function Customer({ draft, change, channels, walkInId }: { draft: SaleDraft; cha
                 onChange={(event) => change({ fromLive: event.target.checked, contactedAt: event.target.checked && !draft.contactedAt ? nowLocalInput() : draft.contactedAt })}
                 className="size-5 rounded border-gray-300 text-brand-600"
               />
-              Came from a {channel.name} live video
+              Came from a live video
             </label>
           )}
           <Field label="When did the customer contact you? (optional)">
