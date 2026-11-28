@@ -5,7 +5,8 @@ import { CircleCheck, CircleDashed, CircleDot } from "lucide-react";
 import { Field, inputClasses } from "@/components/inventory/field";
 import { formatPrice } from "@/lib/labels";
 import { decimalText } from "@/lib/numbers";
-import { paymentMethodLabels, type PaymentMethod, type PaymentStatus, type Supplier } from "@/types/supplier";
+import { MethodSelect } from "@/components/company-lists/method-select";
+import type { PaymentStatus, Supplier } from "@/types/supplier";
 import { SupplierSelect } from "./supplier-select";
 
 /** The supplier and payment of new stock, while typing */
@@ -13,11 +14,12 @@ export interface DeliveryPaymentForm {
   supplier: Supplier | null;
   paymentStatus: PaymentStatus | "";
   amountPaid: string;
-  paymentMethod: PaymentMethod;
+  /** "" = Cash */
+  paymentMethodId: string;
   payByDate: string;
 }
 
-export const emptyDeliveryPayment: DeliveryPaymentForm = { supplier: null, paymentStatus: "", amountPaid: "", paymentMethod: "cash", payByDate: "" };
+export const emptyDeliveryPayment: DeliveryPaymentForm = { supplier: null, paymentStatus: "", amountPaid: "", paymentMethodId: "", payByDate: "" };
 
 const round = (value: number) => Math.round(value * 100) / 100;
 
@@ -43,7 +45,7 @@ export const toDeliveryPayment = (form: DeliveryPaymentForm) => ({
   supplierId: form.supplier?.id ?? "",
   paymentStatus: (form.paymentStatus || "unpaid") as PaymentStatus,
   amountPaid: form.paymentStatus === "partial" ? Number(form.amountPaid) : null,
-  paymentMethod: form.paymentStatus === "unpaid" ? null : form.paymentMethod,
+  paymentMethodId: form.paymentStatus === "unpaid" ? null : form.paymentMethodId || null,
   payByDate: form.paymentStatus === "paid" ? null : form.payByDate || null,
 });
 
@@ -121,15 +123,7 @@ export function DeliveryPaymentFields({ value, onChange, quantity, unitCost }: D
             </Field>
           )}
           {value.paymentStatus !== "unpaid" && (
-            <Field label="Paid by" isRequired>
-              <select value={value.paymentMethod} onChange={(event) => onChange({ paymentMethod: event.target.value as PaymentMethod })} className={inputClasses}>
-                {Object.entries(paymentMethodLabels).map(([method, label]) => (
-                  <option key={method} value={method}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </Field>
+            <MethodSelect value={value.paymentMethodId} onChange={(paymentMethodId) => onChange({ paymentMethodId })} />
           )}
           {value.paymentStatus !== "paid" && (
             <Field label="Pay the rest by (optional)">

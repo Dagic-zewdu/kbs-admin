@@ -14,6 +14,7 @@ import { customerPrice, vatOf } from "@/lib/pricing";
 import { useGetSettingsQuery, useUpdateSettingsMutation } from "@/store/api/settings.api";
 import { useAppSelector } from "@/store/hooks";
 import type { CompanySettings } from "@/types/settings";
+import { ChannelsSettings, PaymentMethodsSettings, ReceiptSettings } from "./company-lists-settings";
 
 const EXAMPLE_PRICE = 1000;
 
@@ -27,6 +28,9 @@ export function SettingsView() {
     <div className="space-y-5 sm:space-y-6">
       <PageHeader title="Settings" description="For your company only." />
       <VatSettings saved={data.data} canEdit={canEdit} />
+      <ReceiptSettings saved={data.data} canEdit={canEdit} />
+      <ChannelsSettings canEdit={canEdit} />
+      <PaymentMethodsSettings canEdit={canEdit} />
     </div>
   );
 }
@@ -39,7 +43,7 @@ function VatSettings({ saved, canEdit }: { saved: CompanySettings; canEdit: bool
   const [isConfirming, setIsConfirming] = useState(false);
   const [update, { isLoading, error, reset }] = useUpdateSettingsMutation();
   const vatRate = Number(rateText);
-  const typed: CompanySettings = { vatEnabled, vatRate };
+  const typed: Pick<CompanySettings, "vatEnabled" | "vatRate"> = { vatEnabled, vatRate };
   const isRateValid = vatRate > 0 && vatRate <= 50;
   const isChanged = vatEnabled !== saved.vatEnabled || vatRate !== saved.vatRate;
   // Only these change what customers pay

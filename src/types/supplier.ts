@@ -1,8 +1,8 @@
+import type { MethodRef } from "./company-lists";
 import type { PaymentAccount, PaymentAccountInput } from "./payment-account";
 
 export type SupplierVisibility = "private" | "shared";
 export type PaymentStatus = "paid" | "partial" | "unpaid";
-export type PaymentMethod = "cash" | "bank_transfer" | "telebirr" | "cbe_birr" | "cheque" | "other";
 
 export interface SupplierPhone {
   phone: string;
@@ -62,7 +62,7 @@ export interface SupplierPayment {
   id: string;
   amount: number;
   paidOn: string;
-  method: PaymentMethod;
+  method: MethodRef;
   note: string | null;
   delivery: { id: string; productName: string | null; variationName: string | null; receivedDate: string | null };
   by: string | null;
@@ -84,20 +84,11 @@ export interface SupplierInput {
 export interface PaymentInput {
   amount: number;
   paidOn: string | null;
-  method: PaymentMethod;
+  methodId: string;
   note: string | null;
 }
 
 export type SupplierFilter = "all" | "owe" | "overdue" | "mine" | "shared" | "inactive";
-
-export const paymentMethodLabels: Record<PaymentMethod, string> = {
-  cash: "Cash",
-  bank_transfer: "Bank transfer",
-  telebirr: "Telebirr",
-  cbe_birr: "CBE Birr",
-  cheque: "Cheque",
-  other: "Other",
-};
 
 export const paymentStatusLabels: Record<PaymentStatus, string> = {
   paid: "Paid",

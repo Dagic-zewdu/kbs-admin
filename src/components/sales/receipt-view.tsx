@@ -2,14 +2,16 @@
 
 import clsx from "clsx";
 import { Loader2, Printer } from "lucide-react";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { getErrorMessage } from "@/lib/api-error";
 import { useGetSaleQuery } from "@/store/api/sales.api";
+import { useGetSettingsQuery } from "@/store/api/settings.api";
 import { useAppSelector } from "@/store/hooks";
-import { channelLabels, salePaymentMethodLabels, type Sale } from "@/types/sale";
+import type { Sale } from "@/types/sale";
 
 type Paper = "80mm" | "a4";
 const money = (value: number) => value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -27,7 +29,7 @@ function Receipt({ sale, companyName, paper }: { sale: Sale; companyName: string
         <p>Receipt {sale.code}</p>
         <p>{new Date(sale.soldAt).toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
         <p>
-          {channelLabels[sale.channel]}
+          {sale.channel?.name}
           {sale.seller?.name && ` · Served by ${sale.seller.name}`}
         </p>
         {sale.customer.name && <p>Customer: {sale.customer.name}</p>}
@@ -81,13 +83,13 @@ function Receipt({ sale, companyName, paper }: { sale: Sale; companyName: string
       <hr className="my-2 border-dashed border-black" />
       {paid.map((payment) => (
         <div key={payment.id} className={row}>
-          <span>Paid · {salePaymentMethodLabels[payment.method]}</span>
+          <span>Paid · {payment.method.name}</span>
           <span>{money(payment.amount)}</span>
         </div>
       ))}
       {refunds.map((payment) => (
         <div key={payment.id} className={row}>
-          <span>Given back · {salePaymentMethodLabels[payment.method]}</span>
+          <span>Given back · {payment.method.name}</span>
           <span>-{money(payment.amount)}</span>
         </div>
       ))}
@@ -107,8 +109,24 @@ function Receipt({ sale, companyName, paper }: { sale: Sale; companyName: string
 /** Preview and print a sale's receipt on a receipt printer (80 mm) or A4 */
 export function ReceiptView({ id }: { id: string }) {
   const companyName = useAppSelector((state) => state.auth.user?.company?.name) ?? "";
+  const router = useRouter();
+  const params = useSearchParams();
+  const printNow = params.get("print") === "1";
   const { data, isLoading, error } = useGetSaleQuery(id);
-  const [paper, setPaper] = useState<Paper>("80mm");
+  const { data: settings } = useGetSettingsQuery();
+  const [paperChoice, setPaper] = useState<Paper | null>(null);
+  const paper: Paper = paperChoice ?? settings?.data.receiptPaper ?? "80mm";
+  const hasPrinted = useRef(false);
+
+  // Right after a sale (Settings: print the receipt): print once, then back to the sale
+  useEffect(() => {
+    if (!printNow || !data || !settings || hasPrinted.current) return;
+    hasPrinted.current = true;
+    const back = () => router.replace(`/sales/${id}?new=1`);
+    window.addEventListener("afterprint", back, { once: true });
+    // Let the receipt render first; not cancelled by a refetch, so it always prints once
+    setTimeout(() => window.print(), 300);
+  }, [printNow, data, settings, id, router]);
   if (isLoading) return <Loader2 className="mx-auto mt-16 size-6 animate-spin text-brand-600" aria-label="Loading" />;
   if (!data) return <p className="py-16 text-center text-sm text-red-600">{getErrorMessage(error) || "Sale not found"}</p>;
   const sale = data.data;

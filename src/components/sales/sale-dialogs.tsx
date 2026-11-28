@@ -1,5 +1,6 @@
 "use client";
 
+import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Field, inputClasses } from "@/components/inventory/field";
 import { FormDialog } from "@/components/inventory/form-dialog";
@@ -8,6 +9,7 @@ import { getErrorMessage } from "@/lib/api-error";
 import { formatPrice } from "@/lib/labels";
 import { decimalText } from "@/lib/numbers";
 import {
+  useGetSaleQuery,
   useAddSalePaymentMutation,
   useCancelSaleMutation,
   useChangeDeliveryStatusMutation,
@@ -15,24 +17,11 @@ import {
   useReturnSaleItemsMutation,
   useUpdateDeliveryMutation,
 } from "@/store/api/sales.api";
-import { deliveryStatusLabels, returnReasonLabels, salePaymentMethodLabels, type DeliveryStatus, type ReturnReason, type Sale, type SalePaymentMethod } from "@/types/sale";
+import { MethodSelect, useMethods } from "@/components/company-lists/method-select";
+import { deliveryStatusLabels, returnReasonLabels, type DeliveryStatus, type ReturnReason, type Sale } from "@/types/sale";
 
 const cents = (value: number) => Math.round(value * 100);
 const birr = (value: number) => value / 100;
-
-function MethodSelect({ value, onChange, label = "Paid by" }: { value: SalePaymentMethod; onChange: (method: SalePaymentMethod) => void; label?: string }) {
-  return (
-    <Field label={label} isRequired>
-      <select value={value} onChange={(event) => onChange(event.target.value as SalePaymentMethod)} className={inputClasses}>
-        {Object.entries(salePaymentMethodLabels).map(([method, text]) => (
-          <option key={method} value={method}>
-            {text}
-          </option>
-        ))}
-      </select>
-    </Field>
-  );
-}
 
 function AmountInput({ value, onChange, max, label }: { value: string; onChange: (value: string) => void; max: number; label: string }) {
   return (
@@ -52,7 +41,9 @@ type Done = (message: string) => void;
 /** Money the customer paid after the sale */
 export function AddPaymentDialog({ sale, onClose, onDone }: { sale: Sale; onClose: () => void; onDone: Done }) {
   const [amount, setAmount] = useState("");
-  const [method, setMethod] = useState<SalePaymentMethod>("cash");
+  const { cash } = useMethods();
+  const [chosenMethod, setMethod] = useState("");
+  const method = chosenMethod || cash?.id || "";
   const [paidOn, setPaidOn] = useState(todayText);
   const [note, setNote] = useState("");
   const [viaDeliverer, setViaDeliverer] = useState(false);
@@ -63,7 +54,7 @@ export function AddPaymentDialog({ sale, onClose, onDone }: { sale: Sale; onClos
     const value = Number(amount);
     if (!(value > 0)) return setLocalError("Enter the amount paid.");
     if (cents(value) > cents(sale.money.left)) return setLocalError(`Only ${formatPrice(sale.money.left)} is left to pay.`);
-    const result = await pay({ id: sale.id, amount: value, method, paidOn: paidOn || null, note: note.trim() || null, viaDeliverer });
+    const result = await pay({ id: sale.id, amount: value, methodId: method, paidOn: paidOn || null, note: note.trim() || null, viaDeliverer });
     if (result.data) onDone(`${formatPrice(value)} recorded.`);
   };
 
@@ -106,7 +97,9 @@ export function DeliveryStatusDialog({ sale, to, onClose, onDone }: { sale: Sale
   const collects = to === "delivered" && sale.money.left > 0;
   const [collect, setCollect] = useState(collects && delivery.cashOnDelivery);
   const [amount, setAmount] = useState(String(sale.money.left));
-  const [method, setMethod] = useState<SalePaymentMethod>("cash");
+  const { cash } = useMethods();
+  const [chosenMethod, setMethod] = useState("");
+  const method = chosenMethod || cash?.id || "";
   const [note, setNote] = useState("");
   const [localError, setLocalError] = useState("");
   const [change, { isLoading, error }] = useChangeDeliveryStatusMutation();
@@ -120,7 +113,7 @@ export function DeliveryStatusDialog({ sale, to, onClose, onDone }: { sale: Sale
       id: sale.id,
       status: to,
       note: note.trim() || null,
-      collected: to === "delivered" ? { amount: collect ? value : 0, method } : undefined,
+      collected: to === "delivered" ? { amount: collect ? value : 0, methodId: method || undefined } : undefined,
     });
     if (result.data) onDone(`Delivery: ${deliveryStatusLabels[to].toLowerCase()}.`);
   };
@@ -215,7 +208,7 @@ export function EditDeliveryDialog({ sale, onClose, onDone }: { sale: Sale; onCl
   );
 }
 
-function RefundFields({ refund, setRefund, max }: { refund: { on: boolean; amount: string; method: SalePaymentMethod }; setRefund: (value: { on: boolean; amount: string; method: SalePaymentMethod }) => void; max: number }) {
+function RefundFields({ refund, setRefund, max }: { refund: { on: boolean; amount: string; method: string }; setRefund: (value: { on: boolean; amount: string; method: string }) => void; max: number }) {
   if (max <= 0) return null;
   return (
     <div className="space-y-3 rounded-lg border border-gray-200 p-3">
@@ -226,26 +219,33 @@ function RefundFields({ refund, setRefund, max }: { refund: { on: boolean; amoun
       {refund.on && (
         <div className="grid gap-3 sm:grid-cols-2">
           <AmountInput label="Refund, ETB" value={refund.amount} onChange={(amount) => setRefund({ ...refund, amount })} max={max} />
-          <MethodSelect value={refund.method} onChange={(method) => setRefund({ ...refund, method })} label="Given back by" />
+          <RefundMethod value={refund.method} onChange={(method) => setRefund({ ...refund, method })} />
         </div>
       )}
     </div>
   );
 }
 
-const toRefundInput = (refund: { on: boolean; amount: string; method: SalePaymentMethod }) =>
-  refund.on && Number(refund.amount) > 0 ? { amount: Number(refund.amount), method: refund.method, note: null } : null;
+/** Cash unless another method was chosen */
+function RefundMethod({ value, onChange }: { value: string; onChange: (methodId: string) => void }) {
+  const { cash } = useMethods();
+  return <MethodSelect value={value || cash?.id || ""} onChange={onChange} label="Given back by" />;
+}
+
+const toRefundInput = (refund: { on: boolean; amount: string; method: string }, cashId: string) =>
+  refund.on && Number(refund.amount) > 0 ? { amount: Number(refund.amount), methodId: refund.method || cashId, note: null } : null;
 
 /** The whole sale, before the customer got it */
 export function CancelSaleDialog({ sale, onClose, onDone }: { sale: Sale; onClose: () => void; onDone: Done }) {
+  const { cash } = useMethods();
   const [reason, setReason] = useState("");
-  const [refund, setRefund] = useState({ on: sale.money.paid > 0, amount: String(sale.money.paid), method: "cash" as SalePaymentMethod });
+  const [refund, setRefund] = useState({ on: sale.money.paid > 0, amount: String(sale.money.paid), method: "" });
   const [localError, setLocalError] = useState("");
   const [cancel, { isLoading, error }] = useCancelSaleMutation();
 
   const submit = async () => {
     if (reason.trim().length < 3) return setLocalError("Write why the sale is cancelled.");
-    const result = await cancel({ id: sale.id, reason: reason.trim(), refund: toRefundInput(refund) });
+    const result = await cancel({ id: sale.id, reason: reason.trim(), refund: toRefundInput(refund, cash?.id ?? "") });
     if (result.data) onDone("The sale was cancelled and the units are back in stock.");
   };
 
@@ -265,12 +265,14 @@ export function CancelSaleDialog({ sale, onClose, onDone }: { sale: Sale; onClos
 }
 
 /** Units the customer brought back */
-export function ReturnDialog({ sale, onClose, onDone }: { sale: Sale; onClose: () => void; onDone: Done }) {
+/** all: every unit still out is chosen (revert a sale) */
+export function ReturnDialog({ sale, onClose, onDone, all = false }: { sale: Sale; onClose: () => void; onDone: Done; all?: boolean }) {
+  const { cash } = useMethods();
   const open = sale.items.filter((item) => item.quantity > item.returned.quantity);
-  const [counts, setCounts] = useState<Record<string, { quantity: number; damaged: boolean }>>(() => Object.fromEntries(open.map((item) => [item.id, { quantity: 0, damaged: false }])));
+  const [counts, setCounts] = useState<Record<string, { quantity: number; damaged: boolean }>>(() => Object.fromEntries(open.map((item) => [item.id, { quantity: all ? item.quantity - item.returned.quantity : 0, damaged: false }])));
   const [reason, setReason] = useState<ReturnReason>("changed_mind");
   const [note, setNote] = useState("");
-  const [refund, setRefund] = useState({ on: true, amount: "", method: "cash" as SalePaymentMethod });
+  const [refund, setRefund] = useState({ on: true, amount: "", method: "" });
   const [localError, setLocalError] = useState("");
   const [returnItems, { isLoading, error }] = useReturnSaleItemsMutation();
 
@@ -285,13 +287,13 @@ export function ReturnDialog({ sale, onClose, onDone }: { sale: Sale; onClose: (
       .map(([saleItemId, line]) => ({ saleItemId, quantity: line.quantity, damaged: line.damaged }));
     if (!items.length) return setLocalError("Choose how many units came back.");
     if (reason === "other" && note.trim().length < 2) return setLocalError("Write why.");
-    const refundInput = refund.on ? toRefundInput({ ...refund, amount: refund.amount || String(suggested) }) : null;
+    const refundInput = refund.on ? toRefundInput({ ...refund, amount: refund.amount || String(suggested) }, cash?.id ?? "") : null;
     const result = await returnItems({ id: sale.id, items, reason, note: note.trim() || null, refund: refundInput });
     if (result.data) onDone("Return recorded.");
   };
 
   return (
-    <FormDialog title="Units brought back" submitLabel="Record return" isLoading={isLoading} error={localError || getErrorMessage(error)} onSubmit={submit} onClose={onClose}>
+    <FormDialog title={all ? `Revert ${sale.code}: everything back` : "Units brought back"} submitLabel={all ? "Revert sale" : "Record return"} isLoading={isLoading} error={localError || getErrorMessage(error)} onSubmit={submit} onClose={onClose}>
       <ul className="space-y-2">
         {open.map((item) => {
           const left = item.quantity - item.returned.quantity;
@@ -347,7 +349,9 @@ export function ReturnDialog({ sale, onClose, onDone }: { sale: Sale; onClose: (
 /** Money given back later */
 export function RefundDialog({ sale, onClose, onDone }: { sale: Sale; onClose: () => void; onDone: Done }) {
   const [amount, setAmount] = useState(String(sale.money.toRefund));
-  const [method, setMethod] = useState<SalePaymentMethod>("cash");
+  const { cash } = useMethods();
+  const [chosenMethod, setMethod] = useState("");
+  const method = chosenMethod || cash?.id || "";
   const [note, setNote] = useState("");
   const [localError, setLocalError] = useState("");
   const [refund, { isLoading, error }] = useRefundSaleMutation();
@@ -355,7 +359,7 @@ export function RefundDialog({ sale, onClose, onDone }: { sale: Sale; onClose: (
   const submit = async () => {
     const value = Number(amount);
     if (!(value > 0) || cents(value) > cents(sale.money.toRefund)) return setLocalError(`Enter up to ${formatPrice(sale.money.toRefund)}.`);
-    const result = await refund({ id: sale.id, amount: value, method, note: note.trim() || null });
+    const result = await refund({ id: sale.id, amount: value, methodId: method, note: note.trim() || null });
     if (result.data) onDone(`${formatPrice(value)} given back.`);
   };
 
@@ -369,6 +373,34 @@ export function RefundDialog({ sale, onClose, onDone }: { sale: Sale; onClose: (
       <Field label="Note (optional)">
         <input value={note} maxLength={300} onChange={(event) => setNote(event.target.value)} className={inputClasses} />
       </Field>
+    </FormDialog>
+  );
+}
+
+/**
+ * Revert a sale from the list: before the customer got it, cancel it;
+ * after (pickup or delivered), record that everything came back. A sale on the way can't be reverted yet.
+ */
+export function RevertSaleDialog({ saleId, onClose, onDone }: { saleId: string; onClose: () => void; onDone: Done }) {
+  const { data, isLoading } = useGetSaleQuery(saleId);
+  if (isLoading || !data) {
+    return (
+      <FormDialog title="Revert sale" submitLabel="Revert sale" isLoading={isLoading} error={isLoading ? "" : "Sale not found."} onSubmit={() => undefined} onClose={onClose}>
+        <Loader2 className="mx-auto size-5 animate-spin text-brand-600" aria-label="Loading" />
+      </FormDialog>
+    );
+  }
+  const sale = data.data;
+  const status = sale.delivery?.status;
+  if (!sale.delivery || status === "pending" || status === "failed") {
+    // A pickup that was never handed over is also simply cancelled
+    if (!sale.delivery && sale.status === "partly_returned") return <ReturnDialog sale={sale} all onClose={onClose} onDone={onDone} />;
+    return <CancelSaleDialog sale={sale} onClose={onClose} onDone={onDone} />;
+  }
+  if (status === "delivered") return <ReturnDialog sale={sale} all onClose={onClose} onDone={onDone} />;
+  return (
+    <FormDialog title={`Revert ${sale.code}`} submitLabel="OK" isLoading={false} error="" onSubmit={onClose} onClose={onClose}>
+      <p className="text-sm text-gray-700">The delivery is on the way. When it comes back, open the sale and mark it “Came back”: the units go back into stock by themselves.</p>
     </FormDialog>
   );
 }

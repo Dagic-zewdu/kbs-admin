@@ -6,7 +6,8 @@ import { FormDialog } from "@/components/inventory/form-dialog";
 import { getErrorMessage } from "@/lib/api-error";
 import { formatPrice } from "@/lib/labels";
 import { decimalText } from "@/lib/numbers";
-import { paymentMethodLabels, type PaymentInput, type PaymentMethod } from "@/types/supplier";
+import { MethodSelect, useMethods } from "@/components/company-lists/method-select";
+import type { PaymentInput } from "@/types/supplier";
 
 export const todayText = () => new Intl.DateTimeFormat("en-CA").format(new Date());
 
@@ -25,7 +26,9 @@ interface PayDialogProps {
 export function PayDialog({ title, owed, hint, isLoading, error, onPay, onClose }: PayDialogProps) {
   const [amount, setAmount] = useState("");
   const [paidOn, setPaidOn] = useState(todayText);
-  const [method, setMethod] = useState<PaymentMethod>("cash");
+  const { cash } = useMethods();
+  const [chosenMethod, setMethod] = useState("");
+  const methodId = chosenMethod || cash?.id || "";
   const [note, setNote] = useState("");
   const [localError, setLocalError] = useState("");
 
@@ -35,7 +38,8 @@ export function PayDialog({ title, owed, hint, isLoading, error, onPay, onClose 
     if (value > owed) return setLocalError(`You owe ${formatPrice(owed)}. The amount can't be more.`);
     if (paidOn > todayText()) return setLocalError("The payment date is in the future.");
     setLocalError("");
-    onPay({ amount: value, paidOn: paidOn || null, method, note: note.trim() || null });
+    if (!methodId) return setLocalError("Choose how it was paid.");
+    onPay({ amount: value, paidOn: paidOn || null, methodId, note: note.trim() || null });
   };
 
   return (
@@ -66,15 +70,7 @@ export function PayDialog({ title, owed, hint, isLoading, error, onPay, onClose 
         <Field label="Paid on" isRequired>
           <input type="date" value={paidOn} max={todayText()} onChange={(event) => setPaidOn(event.target.value)} className={inputClasses} />
         </Field>
-        <Field label="Paid by" isRequired>
-          <select value={method} onChange={(event) => setMethod(event.target.value as PaymentMethod)} className={inputClasses}>
-            {Object.entries(paymentMethodLabels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </Field>
+        <MethodSelect value={methodId} onChange={setMethod} />
         <Field label="Note (optional)">
           <input value={note} maxLength={300} onChange={(event) => setNote(event.target.value)} placeholder="Receipt 1043" className={inputClasses} />
         </Field>

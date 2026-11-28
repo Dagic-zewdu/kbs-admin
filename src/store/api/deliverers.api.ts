@@ -1,6 +1,5 @@
 import type { ApiResponse, PaginatedResult } from "@/types/auth";
 import type { Deliverer, DelivererInput, DelivererMoneyEntry, DelivererType, DelivererWithMoney } from "@/types/deliverer";
-import type { SalePaymentMethod } from "@/types/sale";
 import { baseApi } from "./base-api";
 
 export type DeliverersPage = PaginatedResult<DelivererWithMoney> & { summary: { feesOwed: number; cashHeld: number; openDeliveries: number } };
@@ -37,13 +36,13 @@ export const deliverersApi = baseApi.injectEndpoints({
       query: ({ id, ...params }) => ({ url: `/admin/deliverers/${id}/money`, params }),
       providesTags: ["Deliverers"],
     }),
-    payDelivererFee: build.mutation<ApiResponse<DelivererWithMoney>, { id: string; amount: number; method: SalePaymentMethod; paidOn: string | null; note: string | null }>({
+    payDelivererFee: build.mutation<ApiResponse<DelivererWithMoney>, { id: string; amount: number; methodId: string; paidOn: string | null; note: string | null }>({
       query: ({ id, ...body }) => ({ url: `/admin/deliverers/${id}/fee-payments`, method: "POST", body }),
       invalidatesTags: ["Deliverers"],
     }),
     recordHandin: build.mutation<
       ApiResponse<DelivererWithMoney>,
-      { id: string; amount: number; keepFee: number; method: SalePaymentMethod; receivedOn: string | null; note: string | null }
+      { id: string; amount: number; keepFee: number; methodId?: string; receivedOn: string | null; note: string | null }
     >({
       query: ({ id, ...body }) => ({ url: `/admin/deliverers/${id}/handins`, method: "POST", body }),
       invalidatesTags: ["Deliverers"],

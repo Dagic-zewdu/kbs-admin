@@ -10,10 +10,13 @@ const HELP_AFTER_MS = 6000;
 interface ScannerDialogProps {
   onScan: (barcode: string) => void;
   onClose: () => void;
+  title?: string;
+  /** Below the camera, e.g. what was scanned so far. With it the camera stays open between scans. */
+  footer?: React.ReactNode;
 }
 
 /** Opens the camera and reads the barcode by itself. Mount it only while it's open. */
-export function ScannerDialog({ onScan, onClose }: ScannerDialogProps) {
+export function ScannerDialog({ onScan, onClose, title = "Scan barcode", footer }: ScannerDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const trackRef = useRef<MediaStreamTrack | null>(null);
@@ -129,18 +132,18 @@ export function ScannerDialog({ onScan, onClose }: ScannerDialogProps) {
         event.preventDefault();
         onClose();
       }}
-      className="m-auto h-dvh max-h-none w-screen max-w-none overflow-hidden bg-gray-950 p-0 text-white sm:h-auto sm:max-h-[90dvh] sm:w-[calc(100%-2rem)] sm:max-w-lg sm:rounded-xl"
+      className={`m-auto h-dvh max-h-none w-screen max-w-none overflow-hidden bg-gray-950 p-0 text-white sm:w-[calc(100%-2rem)] sm:max-w-lg sm:rounded-xl ${footer ? "sm:h-[90dvh]" : "sm:h-auto sm:max-h-[90dvh]"}`}
     >
       <div className="flex h-full flex-col">
         <div className="flex items-center justify-between px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
           <h2 id={titleId} className="text-base font-semibold">
-            Scan barcode
+            {title}
           </h2>
           <button type="button" onClick={onClose} aria-label="Close scanner" className="flex size-11 items-center justify-center rounded-lg hover:bg-white/10">
             <X className="size-5" />
           </button>
         </div>
-        <div className="relative flex-1 overflow-hidden bg-black sm:aspect-[4/3] sm:flex-none">
+        <div className={`relative overflow-hidden bg-black ${footer ? "h-[38dvh] shrink-0 sm:aspect-video sm:h-auto" : "flex-1 sm:aspect-[4/3] sm:flex-none"}`}>
           <video ref={videoRef} muted playsInline className={`absolute inset-0 size-full object-cover ${isMirrored ? "-scale-x-100" : ""}`} />
           {isReady && (
             <div className="pointer-events-none absolute inset-x-8 top-1/2 h-36 -translate-y-1/2 rounded-xl border-2 border-white/90 shadow-[0_0_0_100vmax_rgba(0,0,0,0.45)]" />
@@ -202,6 +205,7 @@ export function ScannerDialog({ onScan, onClose }: ScannerDialogProps) {
             )}
           </div>
         </div>
+        {footer && <div className="flex min-h-0 flex-1 flex-col border-t border-white/10 bg-white text-gray-900">{footer}</div>}
       </div>
     </dialog>
   );

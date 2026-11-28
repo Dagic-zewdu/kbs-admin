@@ -1,10 +1,10 @@
 import type { ApiResponse, PaginatedResult } from "@/types/auth";
-import type { DeliveryStatus, ReturnReason, Sale, SaleInput, SaleListItem, SaleLookup, SalePaymentMethod, SalesQuery, SaleSummary } from "@/types/sale";
+import type { DeliveryStatus, ReturnReason, Sale, SaleInput, SaleListItem, SaleLookup, SalesQuery, SaleSummary } from "@/types/sale";
 import { baseApi } from "./base-api";
 
 export type SalesPage = PaginatedResult<SaleListItem> & { summary: { sales: number; total: number; profit: number; paid: number; left: number; toRefund: number } };
 export type DeliveriesPage = PaginatedResult<SaleSummary> & { counts: Record<DeliveryStatus, number> };
-type Refund = { amount: number; method: SalePaymentMethod; note: string | null };
+type Refund = { amount: number; methodId: string; note: string | null };
 
 const clean = <T extends object>(params: T) => Object.fromEntries(Object.entries(params).filter(([, value]) => value !== undefined && value !== ""));
 
@@ -31,7 +31,7 @@ export const salesApi = baseApi.injectEndpoints({
       query: (body) => ({ url: "/admin/sales", method: "POST", body }),
       invalidatesTags: ["Sales", "Inventory", "Deliverers", "Products"],
     }),
-    addSalePayment: build.mutation<ApiResponse<Sale>, { id: string; amount: number; method: SalePaymentMethod; paidOn: string | null; note: string | null; viaDeliverer?: boolean }>({
+    addSalePayment: build.mutation<ApiResponse<Sale>, { id: string; amount: number; methodId: string; paidOn: string | null; note: string | null; viaDeliverer?: boolean }>({
       query: ({ id, ...body }) => ({ url: `/admin/sales/${id}/payments`, method: "POST", body }),
       invalidatesTags: ["Sales", "Deliverers"],
     }),
@@ -48,7 +48,7 @@ export const salesApi = baseApi.injectEndpoints({
     }),
     changeDeliveryStatus: build.mutation<
       ApiResponse<Sale>,
-      { id: string; status: Exclude<DeliveryStatus, "cancelled">; note?: string | null; collected?: { amount?: number; method: SalePaymentMethod } }
+      { id: string; status: Exclude<DeliveryStatus, "cancelled">; note?: string | null; collected?: { amount?: number; methodId?: string } }
     >({
       query: ({ id, ...body }) => ({ url: `/admin/sales/${id}/delivery/status`, method: "POST", body }),
       invalidatesTags: ["Sales", "Deliverers", "Inventory", "Products"],

@@ -1,5 +1,5 @@
 import type { ProductStatus } from "./product";
-import type { DeliveryMoney, PaymentMethod, PaymentStatus } from "./supplier";
+import type { DeliveryMoney, PaymentStatus } from "./supplier";
 
 export interface VariationStock {
   /** Units that can be sold (not expired) */
@@ -102,7 +102,7 @@ export interface DeliveryPayment {
   supplierId: string;
   paymentStatus: PaymentStatus;
   amountPaid: number | null;
-  paymentMethod: PaymentMethod | null;
+  paymentMethodId: string | null;
   payByDate: string | null;
 }
 

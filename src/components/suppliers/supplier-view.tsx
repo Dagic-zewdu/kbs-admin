@@ -22,7 +22,7 @@ import {
   usePaySupplierMutation,
   useRemovePaymentMutation,
 } from "@/store/api/suppliers.api";
-import { paymentMethodLabels, type SupplierDelivery, type SupplierPayment, type SupplierWithMoney } from "@/types/supplier";
+import type { SupplierDelivery, SupplierPayment, SupplierWithMoney } from "@/types/supplier";
 import { PaymentAccountsList } from "@/components/payment-accounts/payment-accounts-list";
 import { PayDialog } from "./pay-dialog";
 import { PaymentBadge } from "./payment-badge";
@@ -341,7 +341,7 @@ function Payments({ id, onRemove }: { id: string; onRemove: (payment: SupplierPa
           <li key={payment.id} className="flex items-center justify-between gap-4 px-4 py-3 text-sm">
             <div className="min-w-0">
               <p className="font-medium text-gray-900">
-                {formatPrice(payment.amount)} <span className="font-normal text-gray-500">· {paymentMethodLabels[payment.method]}</span>
+                {formatPrice(payment.amount)} <span className="font-normal text-gray-500">· {payment.method.name}</span>
               </p>
               <p className="break-words text-xs text-gray-500">
                 {[formatDay(payment.paidOn), payment.delivery.productName && `for ${payment.delivery.productName}${payment.delivery.variationName ? ` · ${payment.delivery.variationName}` : ""}`, payment.by, payment.note]

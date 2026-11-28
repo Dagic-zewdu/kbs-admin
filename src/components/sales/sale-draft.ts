@@ -1,4 +1,3 @@
-import type { SaleChannel, SalePaymentMethod } from "@/types/sale";
 
 /** One line of the cart */
 export interface CartLine {
@@ -14,27 +13,29 @@ export interface CartLine {
 
 export interface SaleDraft {
   lines: CartLine[];
-  channel: SaleChannel;
+  /** "" = Walk-in customer */
+  channelId: string;
   customerName: string;
   customerPhone: string;
   note: string;
   mode: "pickup" | "delivery";
   delivery: { delivererId: string | null; delivererName: string; address: string; totalFee: string; companyShare: string; cashOnDelivery: boolean };
   pay: "full" | "part" | "none";
-  method: SalePaymentMethod;
+  /** "" = Cash */
+  methodId: string;
   partAmount: string;
 }
 
 export const emptySaleDraft = (): SaleDraft => ({
   lines: [],
-  channel: "shop",
+  channelId: "",
   customerName: "",
   customerPhone: "",
   note: "",
   mode: "pickup",
   delivery: { delivererId: null, delivererName: "", address: "", totalFee: "", companyShare: "", cashOnDelivery: true },
   pay: "full",
-  method: "cash",
+  methodId: "",
   partAmount: "",
 });
 

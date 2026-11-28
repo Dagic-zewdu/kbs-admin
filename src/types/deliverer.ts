@@ -1,3 +1,4 @@
+import type { MethodRef } from "./company-lists";
 import type { PaymentAccount, PaymentAccountInput } from "./payment-account";
 
 export type DelivererType = "person" | "company";
@@ -53,7 +54,7 @@ export interface DelivererMoneyEntry {
   id: string;
   kind: "fee_paid" | "fee_kept" | "handed_in" | "collected";
   amount: number;
-  method: "cash" | "telebirr" | "cbe_birr" | "bank_transfer" | "other";
+  method: MethodRef;
   date: string;
   note: string | null;
   sale: { id: string; code: string } | null;

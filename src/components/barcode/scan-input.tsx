@@ -13,10 +13,12 @@ interface ScanInputProps {
   onChange: (value: string) => void;
   /** A scan, or Enter (USB scanners press it) */
   onDone?: (value: string) => void;
+  /** Opens your own camera screen instead of the single-scan one */
+  onScanClick?: () => void;
 }
 
 /** A barcode to scan with the camera or a USB scanner, or to type */
-export function ScanInput({ label, isRequired, value, onChange, onDone }: ScanInputProps) {
+export function ScanInput({ label, isRequired, value, onChange, onDone, onScanClick }: ScanInputProps) {
   const inputId = useId();
   const [isScanning, setIsScanning] = useState(false);
   return (
@@ -41,7 +43,7 @@ export function ScanInput({ label, isRequired, value, onChange, onDone }: ScanIn
           }}
           className="h-11 w-full min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 sm:h-10"
         />
-        <Button type="button" variant="secondary" onClick={() => setIsScanning(true)}>
+        <Button type="button" variant="secondary" onClick={() => (onScanClick ? onScanClick() : setIsScanning(true))}>
           <ScanBarcode className="size-4" aria-hidden /> Scan
         </Button>
       </div>

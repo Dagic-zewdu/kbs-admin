@@ -16,29 +16,17 @@ import { decimalText } from "@/lib/numbers";
 import { useListDelivererMoneyQuery, usePayDelivererFeeMutation, useRecordHandinMutation, useRemoveDelivererMoneyMutation } from "@/store/api/deliverers.api";
 import { useListDeliveriesQuery } from "@/store/api/sales.api";
 import { moneyKindLabels, type DelivererMoneyEntry, type DelivererWithMoney } from "@/types/deliverer";
-import { salePaymentMethodLabels, type SalePaymentMethod } from "@/types/sale";
+import { MethodSelect, useMethods } from "@/components/company-lists/method-select";
 
 const cents = (value: number) => Math.round(value * 100);
-
-function MethodSelect({ value, onChange, label }: { value: SalePaymentMethod; onChange: (method: SalePaymentMethod) => void; label: string }) {
-  return (
-    <Field label={label} isRequired>
-      <select value={value} onChange={(event) => onChange(event.target.value as SalePaymentMethod)} className={inputClasses}>
-        {Object.entries(salePaymentMethodLabels).map(([method, text]) => (
-          <option key={method} value={method}>
-            {text}
-          </option>
-        ))}
-      </select>
-    </Field>
-  );
-}
 
 /** Pay a deliverer their fees */
 export function PayFeeDialog({ deliverer, onClose, onDone }: { deliverer: DelivererWithMoney; onClose: () => void; onDone: (message: string) => void }) {
   const owed = deliverer.money.feesOwed;
   const [amount, setAmount] = useState(String(owed));
-  const [method, setMethod] = useState<SalePaymentMethod>(deliverer.accounts[0]?.method === "telebirr" ? "telebirr" : "cash");
+  const { cash } = useMethods();
+  const [chosenMethod, setMethod] = useState("");
+  const method = chosenMethod || cash?.id || "";
   const [paidOn, setPaidOn] = useState(todayText);
   const [note, setNote] = useState("");
   const [localError, setLocalError] = useState("");
@@ -47,7 +35,7 @@ export function PayFeeDialog({ deliverer, onClose, onDone }: { deliverer: Delive
   const submit = async () => {
     const value = Number(amount);
     if (!(value > 0) || cents(value) > cents(owed)) return setLocalError(`Enter up to ${formatPrice(owed)}.`);
-    const result = await pay({ id: deliverer.id, amount: value, method, paidOn: paidOn || null, note: note.trim() || null });
+    const result = await pay({ id: deliverer.id, amount: value, methodId: method, paidOn: paidOn || null, note: note.trim() || null });
     if (result.data) onDone(`${formatPrice(value)} fee paid.`);
   };
 
@@ -81,7 +69,9 @@ export function HandinDialog({ deliverer, onClose, onDone }: { deliverer: Delive
   const canKeep = Math.max(Math.min(feesOwed, cashHeld), 0);
   const [keepFee, setKeepFee] = useState(String(canKeep));
   const [amount, setAmount] = useState(String(Math.max(cashHeld - canKeep, 0)));
-  const [method, setMethod] = useState<SalePaymentMethod>("cash");
+  const { cash } = useMethods();
+  const [chosenMethod, setMethod] = useState("");
+  const method = chosenMethod || cash?.id || "";
   const [receivedOn, setReceivedOn] = useState(todayText);
   const [note, setNote] = useState("");
   const [localError, setLocalError] = useState("");
@@ -93,7 +83,7 @@ export function HandinDialog({ deliverer, onClose, onDone }: { deliverer: Delive
     if (handed + kept <= 0) return setLocalError("Enter what they handed in.");
     if (cents(kept) > cents(Math.max(feesOwed, 0))) return setLocalError(`They can keep at most ${formatPrice(Math.max(feesOwed, 0))} (fees we owe).`);
     if (cents(handed) + cents(kept) > cents(cashHeld)) return setLocalError(`They hold only ${formatPrice(cashHeld)}.`);
-    const result = await record({ id: deliverer.id, amount: handed, keepFee: kept, method, receivedOn: receivedOn || null, note: note.trim() || null });
+    const result = await record({ id: deliverer.id, amount: handed, keepFee: kept, methodId: method || undefined, receivedOn: receivedOn || null, note: note.trim() || null });
     if (result.data) onDone(`${formatPrice(handed)} handed in${kept ? `, ${formatPrice(kept)} kept as their fee` : ""}.`);
   };
 
@@ -170,7 +160,7 @@ export function DelivererMoneyHistory({ delivererId, onRemoved }: { delivererId:
           <li key={entry.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
             <div className="min-w-0">
               <p className={clsx("font-medium", entry.kind === "collected" ? "text-amber-800" : "text-gray-900")}>
-                {moneyKindLabels[entry.kind]} {formatPrice(entry.amount)} <span className="font-normal text-gray-500">· {salePaymentMethodLabels[entry.method]}</span>
+                {moneyKindLabels[entry.kind]} {formatPrice(entry.amount)} <span className="font-normal text-gray-500">· {entry.method.name}</span>
               </p>
               <p className="break-words text-xs text-gray-500">
                 {formatDay(entry.date)}

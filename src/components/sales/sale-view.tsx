@@ -12,7 +12,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { getErrorMessage } from "@/lib/api-error";
 import { formatDay, formatPrice } from "@/lib/labels";
 import { useGetSaleQuery, useRemoveSalePaymentMutation } from "@/store/api/sales.api";
-import { channelLabels, deliveryStatusLabels, returnReasonLabels, salePaymentMethodLabels, type DeliveryStatus, type Sale, type SalePayment } from "@/types/sale";
+import { deliveryStatusLabels, returnReasonLabels, type DeliveryStatus, type Sale, type SalePayment } from "@/types/sale";
 import { DeliveryStatusBadge, formatTime, PaymentStatusBadge, SaleStatusBadge } from "./sale-badges";
 import { AddPaymentDialog, CancelSaleDialog, DeliveryStatusDialog, EditDeliveryDialog, nextDeliveryStatuses, RefundDialog, ReturnDialog } from "./sale-dialogs";
 
@@ -60,7 +60,7 @@ export function SaleView({ id }: { id: string }) {
     <div className="space-y-5 sm:space-y-6">
       <PageHeader
         title={`Sale ${sale.code}`}
-        description={[formatTime(sale.soldAt), channelLabels[sale.channel], sale.seller?.name && `by ${sale.seller.name}`].filter(Boolean).join(" · ")}
+        description={[formatTime(sale.soldAt), sale.channel?.name, sale.seller?.name && `by ${sale.seller.name}`].filter(Boolean).join(" · ")}
         backHref="/sales"
         actions={
           <>
@@ -151,7 +151,7 @@ export function SaleView({ id }: { id: string }) {
                   <div className="min-w-0">
                     <p className={clsx("font-medium", payment.isRefund ? "text-violet-800" : "text-gray-900")}>
                       {payment.isRefund ? "Given back " : ""}
-                      {formatPrice(payment.amount)} <span className="font-normal text-gray-500">· {salePaymentMethodLabels[payment.method]}</span>
+                      {formatPrice(payment.amount)} <span className="font-normal text-gray-500">· {payment.method.name}</span>
                     </p>
                     <p className="break-words text-xs text-gray-500">
                       {[formatDay(payment.paidOn), payment.viaDeliverer && `collected by ${payment.viaDeliverer.name}`, payment.by, payment.note].filter(Boolean).join(" · ")}

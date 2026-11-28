@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { Bike, ChevronRight, Loader2, Plus, Search, ShoppingBag } from "lucide-react";
+import { Bike, ChevronRight, Eye, Loader2, Plus, Printer, Search, ShoppingBag, Undo2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
@@ -10,7 +10,10 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { getErrorMessage } from "@/lib/api-error";
 import { formatPrice } from "@/lib/labels";
 import { useListSalesQuery } from "@/store/api/sales.api";
-import { channelLabels, type SaleChannel, type SalePaymentStatus, type SalesQuery } from "@/types/sale";
+import { Alert } from "@/components/ui/alert";
+import { useListChannelsQuery } from "@/store/api/settings.api";
+import type { SaleListItem, SalePaymentStatus, SalesQuery } from "@/types/sale";
+import { RevertSaleDialog } from "./sale-dialogs";
 import { DeliveryStatusBadge, formatTime, PaymentStatusBadge, SaleStatusBadge } from "./sale-badges";
 
 const PAGE_SIZE = 20;
@@ -41,12 +44,18 @@ const chip = (isOn: boolean) =>
   );
 const selectClasses = "h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none";
 
+/** Still open, and not on its way (that one is reverted when it comes back) */
+const canRevert = (sale: SaleListItem) => (sale.status === "completed" || sale.status === "partly_returned") && sale.delivery?.status !== "on_the_way" && sale.delivery?.status !== "returned";
+
 /** Every sale, newest first, with what was sold, paid and earned */
 export function SalesView() {
   const [searchText, setSearchText] = useState("");
   const [period, setPeriod] = useState<Period>("today");
   const [range, setRange] = useState({ from: daysAgo(7), to: today() });
-  const [channel, setChannel] = useState<SaleChannel | "">("");
+  const [channel, setChannel] = useState("");
+  const [reverting, setReverting] = useState<string | null>(null);
+  const [notice, setNotice] = useState("");
+  const { data: channelData } = useListChannelsQuery({ all: true });
   const [paymentStatus, setPaymentStatus] = useState<SalePaymentStatus | "">("");
   const [delivery, setDelivery] = useState<SalesQuery["deliveryStatus"] | "">("");
   const [page, setPage] = useState(1);
@@ -59,7 +68,7 @@ export function SalesView() {
     limit: PAGE_SIZE,
     search,
     ...dates,
-    channel: channel || undefined,
+    channelId: channel || undefined,
     paymentStatus: paymentStatus || undefined,
     deliveryStatus: delivery || undefined,
   });
@@ -133,11 +142,11 @@ export function SalesView() {
           </div>
         )}
         <div className="flex flex-wrap gap-2">
-          <select value={channel} onChange={(event) => (setChannel(event.target.value as SaleChannel | ""), reset())} aria-label="Channel" className={selectClasses}>
+          <select value={channel} onChange={(event) => (setChannel(event.target.value), reset())} aria-label="Channel" className={selectClasses}>
             <option value="">Every channel</option>
-            {Object.entries(channelLabels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
+            {(channelData?.data ?? []).map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
               </option>
             ))}
           </select>
@@ -160,6 +169,17 @@ export function SalesView() {
         </div>
       </div>
 
+      {notice && <Alert type="success">{notice}</Alert>}
+      {reverting && (
+        <RevertSaleDialog
+          saleId={reverting}
+          onClose={() => setReverting(null)}
+          onDone={(message) => {
+            setReverting(null);
+            setNotice(message);
+          }}
+        />
+      )}
       <section className="relative overflow-hidden rounded-xl border border-gray-200 bg-white">
         {isFetching && !isLoading && <Loader2 className="absolute top-3 right-3 size-4 animate-spin text-brand-500" aria-label="Updating" />}
         {isLoading && <Loader2 className="mx-auto my-16 size-6 animate-spin text-brand-600" aria-label="Loading" />}
@@ -174,7 +194,8 @@ export function SalesView() {
         )}
         {result && result.items.length > 0 && (
           <>
-            <ul className="divide-y divide-gray-100">
+            {/* Phones: one card per sale */}
+            <ul className="divide-y divide-gray-100 md:hidden">
               {result.items.map((sale) => (
                 <li key={sale.id}>
                   <Link href={`/sales/${sale.id}`} className="flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50">
@@ -191,7 +212,7 @@ export function SalesView() {
                         )}
                       </span>
                       <span className="mt-0.5 block truncate text-sm text-gray-500">
-                        {[formatTime(sale.soldAt), sale.customer.name, channelLabels[sale.channel], `${sale.units} ${sale.units === 1 ? "unit" : "units"}`, sale.seller?.name].filter(Boolean).join(" · ")}
+                        {[formatTime(sale.soldAt), sale.customer.name, sale.channel?.name, `${sale.units} ${sale.units === 1 ? "unit" : "units"}`, sale.seller?.name].filter(Boolean).join(" · ")}
                       </span>
                     </span>
                     <span className="shrink-0 text-right text-sm">
@@ -203,6 +224,82 @@ export function SalesView() {
                 </li>
               ))}
             </ul>
+            {/* Bigger screens: a table with actions */}
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[1100px] text-left text-sm">
+                <thead className="border-b border-gray-100 bg-gray-50 text-xs font-semibold tracking-wide text-gray-500 uppercase">
+                  <tr>
+                    <th className="px-4 py-3">Sale</th>
+                    <th className="px-3 py-3">Date</th>
+                    <th className="px-3 py-3">Customer</th>
+                    <th className="px-3 py-3">Channel</th>
+                    <th className="px-3 py-3 text-right">Units</th>
+                    <th className="px-3 py-3 text-right">Total</th>
+                    <th className="px-3 py-3 text-right">Paid</th>
+                    <th className="px-3 py-3 text-right">Left</th>
+                    <th className="px-3 py-3">Payment</th>
+                    <th className="px-3 py-3">Delivery</th>
+                    <th className="px-3 py-3 text-right">Profit</th>
+                    <th className="px-3 py-3">Seller</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {result.items.map((sale) => (
+                    <tr key={sale.id} className={clsx("hover:bg-gray-50", sale.status === "cancelled" && "text-gray-400")}>
+                      <td className="px-4 py-3">
+                        <Link href={`/sales/${sale.id}`} className="font-medium text-gray-900 hover:text-brand-700 hover:underline">
+                          {sale.code}
+                        </Link>
+                        {sale.status !== "completed" && (
+                          <span className="mt-1 block">
+                            <SaleStatusBadge status={sale.status} />
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap text-gray-600">{formatTime(sale.soldAt)}</td>
+                      <td className="px-3 py-3">
+                        <span className="block text-gray-900">{sale.customer.name ?? "Walk-in"}</span>
+                        {sale.customer.phone && <span className="block text-xs text-gray-500">{sale.customer.phone}</span>}
+                      </td>
+                      <td className="px-3 py-3 text-gray-600">{sale.channel?.name ?? "—"}</td>
+                      <td className="px-3 py-3 text-right tabular-nums">{sale.units}</td>
+                      <td className="px-3 py-3 text-right font-medium whitespace-nowrap text-gray-900 tabular-nums">{formatPrice(sale.money.total)}</td>
+                      <td className="px-3 py-3 text-right whitespace-nowrap tabular-nums">{formatPrice(sale.money.paid)}</td>
+                      <td className={clsx("px-3 py-3 text-right whitespace-nowrap tabular-nums", sale.money.toRefund > 0 ? "text-violet-800" : sale.money.left > 0 ? "text-amber-800" : "")}>
+                        {sale.money.toRefund > 0 ? `−${formatPrice(sale.money.toRefund)}` : formatPrice(sale.money.left)}
+                      </td>
+                      <td className="px-3 py-3">
+                        <PaymentStatusBadge status={sale.money.paymentStatus} />
+                      </td>
+                      <td className="px-3 py-3">{sale.delivery ? <DeliveryStatusBadge status={sale.delivery.status} /> : <span className="text-xs text-gray-500">Pickup</span>}</td>
+                      <td className={clsx("px-3 py-3 text-right whitespace-nowrap tabular-nums", sale.money.profit < 0 ? "text-red-700" : "text-emerald-700")}>{formatPrice(sale.money.profit)}</td>
+                      <td className="px-3 py-3 text-gray-600">{sale.seller?.name ?? "—"}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-1">
+                          <Link href={`/sales/${sale.id}`} aria-label={`View ${sale.code}`} title="View" className="flex size-9 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900">
+                            <Eye className="size-4" aria-hidden />
+                          </Link>
+                          <Link href={`/sales/${sale.id}/receipt`} aria-label={`Receipt of ${sale.code}`} title="Receipt" className="flex size-9 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900">
+                            <Printer className="size-4" aria-hidden />
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => setReverting(sale.id)}
+                            disabled={!canRevert(sale)}
+                            aria-label={`Revert ${sale.code}`}
+                            title={canRevert(sale) ? "Revert sale" : "Can't be reverted"}
+                            className="flex size-9 items-center justify-center rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-700 disabled:opacity-30 disabled:hover:bg-transparent"
+                          >
+                            <Undo2 className="size-4" aria-hidden />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             <Pagination page={result.page} totalPages={result.totalPages} total={result.total} limit={result.limit} onPageChange={setPage} />
           </>
         )}

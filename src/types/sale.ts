@@ -1,9 +1,8 @@
+import type { ChannelRef, MethodRef } from "./company-lists";
 import type { DelivererType } from "./deliverer";
 import type { ProductStatus } from "./product";
 
-export type SaleChannel = "shop" | "phone" | "telegram" | "instagram" | "tiktok" | "facebook" | "website" | "other";
 export type SaleStatus = "completed" | "cancelled" | "returned" | "partly_returned";
-export type SalePaymentMethod = "cash" | "telebirr" | "cbe_birr" | "bank_transfer" | "other";
 export type SalePaymentStatus = "paid" | "partial" | "unpaid" | "refund_due" | "none";
 export type DeliveryStatus = "pending" | "on_the_way" | "delivered" | "failed" | "returned" | "cancelled";
 export type ReturnReason = "changed_mind" | "damaged" | "wrong_item" | "expired" | "other";
@@ -69,7 +68,7 @@ export interface SaleSummary {
   number: number;
   code: string;
   soldAt: string;
-  channel: SaleChannel;
+  channel: ChannelRef | null;
   status: SaleStatus;
   cancelReason: string | null;
   cancelledAt: string | null;
@@ -98,7 +97,7 @@ export interface SaleItem {
 export interface SalePayment {
   id: string;
   amount: number;
-  method: SalePaymentMethod;
+  method: MethodRef;
   paidOn: string;
   note: string | null;
   isRefund: boolean;
@@ -132,11 +131,11 @@ export interface SaleListItem extends SaleSummary {
 
 export interface SaleInput {
   items: { variationId: string; quantity: number; discount: { type: "amount" | "percent"; value: number; reason: string } | null }[];
-  channel: SaleChannel;
+  channelId: string;
   customerName: string | null;
   customerPhone: string | null;
   note: string | null;
-  payments: { amount: number; method: SalePaymentMethod; note: string | null }[];
+  payments: { amount: number; methodId: string; note: string | null }[];
   delivery: { delivererId: string; address: string; totalFee: number; companyShare: number; cashOnDelivery: boolean } | null;
 }
 
@@ -146,31 +145,12 @@ export interface SalesQuery {
   search?: string;
   from?: string;
   to?: string;
-  channel?: SaleChannel;
+  channelId?: string;
   status?: SaleStatus;
   paymentStatus?: SalePaymentStatus;
   deliveryStatus?: DeliveryStatus | "none";
   delivererId?: string;
 }
-
-export const channelLabels: Record<SaleChannel, string> = {
-  shop: "Shop",
-  phone: "Phone",
-  telegram: "Telegram",
-  instagram: "Instagram",
-  tiktok: "TikTok",
-  facebook: "Facebook",
-  website: "Website",
-  other: "Other",
-};
-
-export const salePaymentMethodLabels: Record<SalePaymentMethod, string> = {
-  cash: "Cash",
-  telebirr: "Telebirr",
-  cbe_birr: "CBE Birr",
-  bank_transfer: "Bank transfer",
-  other: "Other",
-};
 
 export const saleStatusLabels: Record<SaleStatus, string> = {
   completed: "Completed",

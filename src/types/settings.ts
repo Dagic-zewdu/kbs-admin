@@ -4,4 +4,7 @@ export interface CompanySettings {
   vatEnabled: boolean;
   /** Percent */
   vatRate: number;
+  /** Print the receipt by itself when a sale is completed. Off by default */
+  receiptAutoPrint: boolean;
+  receiptPaper: "80mm" | "a4";
 }
