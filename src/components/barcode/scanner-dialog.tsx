@@ -21,6 +21,7 @@ export function ScannerDialog({ onScan, onClose, title = "Scan barcode", footer 
   const videoRef = useRef<HTMLVideoElement>(null);
   const trackRef = useRef<MediaStreamTrack | null>(null);
   const onScanRef = useRef(onScan);
+  const hasFooterRef = useRef(Boolean(footer));
   const titleId = useId();
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState("");
@@ -80,11 +81,16 @@ export function ScannerDialog({ onScan, onClose, title = "Scan barcode", footer 
         setIsReady(true);
         helpTimer = setTimeout(() => setNeedsHelp(true), HELP_AFTER_MS);
         keepFocusing(track);
-        scanner.watch(video, (code) => {
-          navigator.vibrate?.(80);
-          if (settings.deviceId) saveCamera(settings.deviceId);
-          onScanRef.current(code);
-        });
+        scanner.watch(
+          video,
+          (code) => {
+            navigator.vibrate?.(80);
+            if (settings.deviceId) saveCamera(settings.deviceId);
+            onScanRef.current(code);
+          },
+          // With a list below, the camera keeps reading one product after another
+          { continuous: hasFooterRef.current },
+        );
       } catch (problem) {
         if (!isStopped) setError(cameraError(problem));
       }

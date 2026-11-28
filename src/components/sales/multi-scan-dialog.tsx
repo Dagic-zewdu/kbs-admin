@@ -1,13 +1,13 @@
 "use client";
 
 import clsx from "clsx";
-import { Loader2, Minus, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Loader2, Minus, Plus, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { ScannerDialog } from "@/components/barcode/scanner-dialog";
 import { getErrorMessage } from "@/lib/api-error";
 import { formatPrice } from "@/lib/labels";
 import { useLazyLookupForSaleQuery } from "@/store/api/sales.api";
-import { saleProblemLabels, type SaleLookup } from "@/types/sale";
+import { problemText, saleProblemLabels, type SaleLookup } from "@/types/sale";
 
 /** One product scanned so far */
 export interface ScannedLine {
@@ -63,7 +63,7 @@ export function MultiScanDialog({ onAdd, onClose }: { onAdd: (lines: ScannedLine
     if (!response.data) {
       beep(false);
       const notFound = response.error && "data" in response.error && (response.error.data as { code?: string })?.code === "CODE_NOT_FOUND";
-      return setMessage({ ok: false, text: notFound ? `No product of yours has the code ${code}.` : getErrorMessage(response.error) });
+      return setMessage({ ok: false, text: notFound ? `Not found: no product has the code ${code}.` : getErrorMessage(response.error) });
     }
     const lookup = response.data.data;
     const scanned = lookup.variations.find((variation) => variation.id === lookup.scannedVariationId)!;
@@ -75,7 +75,8 @@ export function MultiScanDialog({ onAdd, onClose }: { onAdd: (lines: ScannedLine
       }
       return [{ lookup, variationId: scanned.id, quantity: 1 }, ...current];
     });
-    setMessage({ ok: scanned.canBeSold, text: scanned.canBeSold ? `${[lookup.product.name, scanned.name].filter(Boolean).join(" · ")}` : `Can't be sold: ${saleProblemLabels[scanned.problem!]}` });
+    const name = [lookup.product.name, scanned.name].filter(Boolean).join(" · ");
+    setMessage({ ok: scanned.canBeSold, text: scanned.canBeSold ? `Added ${name}` : `${name}: ${problemText(scanned.problem!, lookup.product.status)}` });
   };
 
   const update = (index: number, change: Partial<ScannedLine>) => setLines((current) => current.map((line, at) => (at === index ? { ...line, ...change } : line)));
@@ -98,12 +99,19 @@ export function MultiScanDialog({ onAdd, onClose }: { onAdd: (lines: ScannedLine
               Scanned: {units} {units === 1 ? "unit" : "units"}
             </span>
             {pending > 0 && <Loader2 className="size-4 animate-spin text-brand-600" aria-label="Looking up" />}
-            {message && (
-              <span role="status" className={clsx("min-w-0 truncate text-xs", message.ok ? "text-emerald-700" : "text-red-700")}>
-                {message.text}
-              </span>
-            )}
           </div>
+          {message && (
+            <p
+              role={message.ok ? "status" : "alert"}
+              className={clsx(
+                "flex items-start gap-2 border-b px-4 py-2.5 text-sm font-medium",
+                message.ok ? "border-emerald-100 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800",
+              )}
+            >
+              {message.ok ? <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden /> : <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />}
+              {message.text}
+            </p>
+          )}
           <ul className="min-h-0 flex-1 divide-y divide-gray-100 overflow-y-auto">
             {lines.length === 0 && <li className="px-4 py-6 text-center text-sm text-gray-500">Point the camera at each product. They are listed here.</li>}
             {lines.map((line, index) => {
@@ -115,7 +123,7 @@ export function MultiScanDialog({ onAdd, onClose }: { onAdd: (lines: ScannedLine
                     <div className="min-w-0">
                       <p className={clsx("font-medium", variation.canBeSold ? "text-gray-900" : "text-red-800")}>{label(line)}</p>
                       <p className={clsx("text-xs", variation.canBeSold ? "text-gray-500" : "text-red-700")}>
-                        {variation.canBeSold ? `${formatPrice(variation.customerPrice)} · ${variation.onHand} in stock` : `Not added: ${saleProblemLabels[variation.problem!]}`}
+                        {variation.canBeSold ? `${formatPrice(variation.customerPrice)} · ${variation.onHand} in stock` : `Not added. ${problemText(variation.problem!, line.lookup.product.status)}`}
                       </p>
                     </div>
                     <button

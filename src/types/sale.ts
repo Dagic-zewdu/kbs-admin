@@ -189,3 +189,13 @@ export const saleProblemLabels: Record<SaleProblem, string> = {
   NO_PRICE: "No selling price",
   OUT_OF_STOCK: "Out of stock",
 };
+
+/** Why a scanned product can't be sold, in plain words */
+export const problemText = (problem: SaleProblem, productStatus?: ProductStatus) =>
+  problem === "STATUS"
+    ? productStatus === "draft"
+      ? "Not active: it is still a draft. Make it private or live to sell it."
+      : "Not active: this product is inactive."
+    : problem === "NO_PRICE"
+      ? "Not available: it has no selling price yet."
+      : "Not available: out of stock.";

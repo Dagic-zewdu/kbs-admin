@@ -100,22 +100,38 @@ const grab = (canvas: HTMLCanvasElement, source: CanvasImageSource, width: numbe
   return context.getImageData(0, 0, canvas.width, canvas.height);
 };
 
-/** Loads while the camera opens. `watch` calls back once, with a sure read. */
+/** The same code again this soon is the same product still in front of the camera */
+const REPEAT_AFTER_MS = 2000;
+
+/**
+ * Loads while the camera opens. `watch` calls back with a sure read: once,
+ * or with `continuous` for every product, one after another, until stopped.
+ */
 export const createScanner = () => {
   const reader: Reader = createWorker();
   const native = createNative();
   let isStopped = false;
 
-  const watch = (video: HTMLVideoElement, onCode: (code: string) => void) => {
+  const watch = (video: HTMLVideoElement, onCode: (code: string) => void, options: { continuous?: boolean } = {}) => {
     const seen = new Map<string, number>();
+    const lastReported = { code: "", at: 0 };
     const report = (found: Found | null) => {
       if (!found?.code || isStopped) return;
       // A 12-digit UPC is the same code as the EAN with a leading 0: the two readers name it differently
       const code = /^\d{12}$/.test(found.code) ? `0${found.code}` : found.code;
+      if (options.continuous && code === lastReported.code && Date.now() - lastReported.at < REPEAT_AFTER_MS) {
+        // Still the same product: wait until it's been away a moment
+        lastReported.at = Date.now();
+        return;
+      }
       const times = (seen.get(code) ?? 0) + 1;
       seen.set(code, times);
       if (times >= (found.isWeak ? WEAK_SURE_AFTER : SURE_AFTER)) {
-        isStopped = true;
+        if (!options.continuous) isStopped = true;
+        // Next product starts counting from zero
+        seen.clear();
+        lastReported.code = code;
+        lastReported.at = Date.now();
         onCode(code);
       }
     };

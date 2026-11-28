@@ -25,7 +25,7 @@ import { useGetSettingsQuery } from "@/store/api/settings.api";
 import { useAppSelector } from "@/store/hooks";
 import type { Deliverer } from "@/types/deliverer";
 import type { SalesChannel } from "@/types/company-lists";
-import { saleProblemLabels, type SaleInput, type SaleLookup } from "@/types/sale";
+import { problemText, saleProblemLabels, type SaleInput, type SaleLookup } from "@/types/sale";
 import { amountOf, birr, cents, emptySaleDraft, lineMoney, saleDraftStore, type CartLine, type SaleDraft } from "./sale-draft";
 
 const chip = (isOn: boolean) =>
@@ -346,12 +346,19 @@ function Scanner({
     if (!response.data) {
       setLookup(null);
       const notFound = response.error && "data" in response.error && (response.error.data as { code?: string })?.code === "CODE_NOT_FOUND";
-      return say("error", notFound ? "No product of yours has this code." : getErrorMessage(response.error));
+      return say("error", notFound ? `Not found: no product has the code ${code}.` : getErrorMessage(response.error));
     }
     const result = response.data.data;
     const scanned = result.variations.find((item) => item.id === result.scannedVariationId);
     // One sellable variation: straight into the cart, ready for the next scan
     if (result.variations.length === 1 && scanned?.canBeSold) return add(result, scanned.id);
+    // Nothing of it can be sold: say why, plainly
+    if (!result.variations.some((item) => item.canBeSold)) {
+      setLookup(null);
+      setText("");
+      return say("error", `${[result.product.name, scanned?.name].filter(Boolean).join(" · ")}: ${problemText(scanned?.problem ?? "STATUS", result.product.status)}`);
+    }
+    if (scanned && !scanned.canBeSold) say("error", `${[result.product.name, scanned.name].filter(Boolean).join(" · ")}: ${problemText(scanned.problem!, result.product.status)} Choose another size below.`);
     setLookup(result);
     setChosen(scanned?.canBeSold ? scanned.id : (result.variations.find((item) => item.canBeSold)?.id ?? null));
   };
@@ -372,7 +379,13 @@ function Scanner({
       )}
       {isFetching && <Loader2 className="size-5 animate-spin text-brand-600" aria-label="Looking" />}
       {message && (
-        <p role="status" className={clsx("rounded-lg px-3 py-2 text-sm", message.type === "success" ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-900")}>
+        <p
+          role={message.type === "success" ? "status" : "alert"}
+          className={clsx(
+            "rounded-lg border px-3 py-2 text-sm font-medium",
+            message.type === "success" ? "border-emerald-100 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800",
+          )}
+        >
           {message.text}
         </p>
       )}
@@ -589,13 +602,15 @@ function Customer({ draft, change, channels, walkInId }: { draft: SaleDraft; cha
   return (
     <section className="space-y-4 rounded-xl border border-gray-200 bg-white p-4">
       <h2 className="text-sm font-semibold text-gray-900">Customer</h2>
-      <div className="scrollbar-none -mx-4 flex gap-1.5 overflow-x-auto px-4">
-        {channels.map((channel) => (
-          <button key={channel.id} type="button" aria-pressed={chosen === channel.id} onClick={() => change({ channelId: channel.id })} className={chip(chosen === channel.id)}>
-            {channel.name}
-          </button>
-        ))}
-      </div>
+      <Field label="Where the customer came from">
+        <select value={chosen} onChange={(event) => change({ channelId: event.target.value })} className={inputClasses}>
+          {channels.map((channel) => (
+            <option key={channel.id} value={channel.id}>
+              {channel.name}
+            </option>
+          ))}
+        </select>
+      </Field>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
         <Field label={isDelivery ? "Name" : "Name (optional)"} isRequired={isDelivery}>
           <input value={draft.customerName} maxLength={120} onChange={(event) => change({ customerName: event.target.value })} placeholder="Meron Alemu" className={inputClasses} />
