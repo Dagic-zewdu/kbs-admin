@@ -241,7 +241,7 @@ export function SalesView() {
                     <th className="px-3 py-3">Delivery</th>
                     <th className="px-3 py-3 text-right">Profit</th>
                     <th className="px-3 py-3">Seller</th>
-                    <th className="px-4 py-3 text-right">Actions</th>
+                    <th className="sticky right-0 bg-gray-50 px-4 py-3 text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.12)]">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -275,7 +275,7 @@ export function SalesView() {
                       <td className="px-3 py-3">{sale.delivery ? <DeliveryStatusBadge status={sale.delivery.status} /> : <span className="text-xs text-gray-500">Pickup</span>}</td>
                       <td className={clsx("px-3 py-3 text-right whitespace-nowrap tabular-nums", sale.money.profit < 0 ? "text-red-700" : "text-emerald-700")}>{formatPrice(sale.money.profit)}</td>
                       <td className="px-3 py-3 text-gray-600">{sale.seller?.name ?? "—"}</td>
-                      <td className="px-4 py-3">
+                      <td className="sticky right-0 bg-white px-4 py-3 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.12)]">
                         <div className="flex justify-end gap-1">
                           <Link href={`/sales/${sale.id}`} aria-label={`View ${sale.code}`} title="View" className="flex size-9 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900">
                             <Eye className="size-4" aria-hidden />

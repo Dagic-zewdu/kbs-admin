@@ -232,6 +232,9 @@ function RefundMethod({ value, onChange }: { value: string; onChange: (methodId:
   return <MethodSelect value={value || cash?.id || ""} onChange={onChange} label="Given back by" />;
 }
 
+/** Money goes back the way it came: the method of the customer's last payment */
+const paidWith = (sale: Sale) => [...sale.payments].reverse().find((payment) => !payment.isRefund)?.method.id ?? "";
+
 const toRefundInput = (refund: { on: boolean; amount: string; method: string }, cashId: string) =>
   refund.on && Number(refund.amount) > 0 ? { amount: Number(refund.amount), methodId: refund.method || cashId, note: null } : null;
 
@@ -239,7 +242,7 @@ const toRefundInput = (refund: { on: boolean; amount: string; method: string }, 
 export function CancelSaleDialog({ sale, onClose, onDone }: { sale: Sale; onClose: () => void; onDone: Done }) {
   const { cash } = useMethods();
   const [reason, setReason] = useState("");
-  const [refund, setRefund] = useState({ on: sale.money.paid > 0, amount: String(sale.money.paid), method: "" });
+  const [refund, setRefund] = useState({ on: sale.money.paid > 0, amount: String(sale.money.paid), method: paidWith(sale) });
   const [localError, setLocalError] = useState("");
   const [cancel, { isLoading, error }] = useCancelSaleMutation();
 
@@ -272,7 +275,7 @@ export function ReturnDialog({ sale, onClose, onDone, all = false }: { sale: Sal
   const [counts, setCounts] = useState<Record<string, { quantity: number; damaged: boolean }>>(() => Object.fromEntries(open.map((item) => [item.id, { quantity: all ? item.quantity - item.returned.quantity : 0, damaged: false }])));
   const [reason, setReason] = useState<ReturnReason>("changed_mind");
   const [note, setNote] = useState("");
-  const [refund, setRefund] = useState({ on: true, amount: "", method: "" });
+  const [refund, setRefund] = useState({ on: true, amount: "", method: paidWith(sale) });
   const [localError, setLocalError] = useState("");
   const [returnItems, { isLoading, error }] = useReturnSaleItemsMutation();
 
@@ -350,7 +353,7 @@ export function ReturnDialog({ sale, onClose, onDone, all = false }: { sale: Sal
 export function RefundDialog({ sale, onClose, onDone }: { sale: Sale; onClose: () => void; onDone: Done }) {
   const [amount, setAmount] = useState(String(sale.money.toRefund));
   const { cash } = useMethods();
-  const [chosenMethod, setMethod] = useState("");
+  const [chosenMethod, setMethod] = useState(() => paidWith(sale));
   const method = chosenMethod || cash?.id || "";
   const [note, setNote] = useState("");
   const [localError, setLocalError] = useState("");
