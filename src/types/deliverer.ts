@@ -47,3 +47,23 @@ export const delivererTypeLabels: Record<DelivererType, string> = {
   person: "Person",
   company: "Delivery company",
 };
+
+/** A fee payment, a hand-in, or customer money they collected */
+export interface DelivererMoneyEntry {
+  id: string;
+  kind: "fee_paid" | "fee_kept" | "handed_in" | "collected";
+  amount: number;
+  method: "cash" | "telebirr" | "cbe_birr" | "bank_transfer" | "other";
+  date: string;
+  note: string | null;
+  sale: { id: string; code: string } | null;
+  by: string | null;
+  createdAt: string;
+}
+
+export const moneyKindLabels: Record<DelivererMoneyEntry["kind"], string> = {
+  fee_paid: "Fee paid",
+  fee_kept: "Fee kept from cash",
+  handed_in: "Cash handed in",
+  collected: "Collected from customer",
+};

@@ -4,6 +4,7 @@ import {
   Boxes,
   FolderTree,
   LayoutDashboard,
+  MapPinned,
   Package,
   Percent,
   Settings,
@@ -45,7 +46,8 @@ export const navSections: NavSection[] = [
   {
     title: "Sales",
     items: [
-      { label: "Orders", href: "/orders", icon: ShoppingBag, comingSoon: true },
+      { label: "Sales", href: "/sales", icon: ShoppingBag },
+      { label: "Deliveries", href: "/deliveries", icon: MapPinned },
       { label: "Deliverers", href: "/deliverers", icon: Bike },
       { label: "Discounts", href: "/discounts", icon: Percent, comingSoon: true },
       { label: "Reports", href: "/reports", icon: BarChart3, comingSoon: true },
@@ -63,8 +65,9 @@ export const navSections: NavSection[] = [
 
 export const isActivePath = (pathname: string, href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
-/** Pages pinned to the bottom bar on phones (max 4, the 5th slot is "Menu"). Skips pages that aren't built yet. */
-export const mobileNavItems: NavItem[] = navSections
-  .flatMap((section) => section.items)
-  .filter((item) => !item.comingSoon)
-  .slice(0, 4);
+const MOBILE_PAGES = ["/dashboard", "/sales", "/products", "/inventory"];
+
+/** Pages pinned to the bottom bar on phones (max 4, the 5th slot is "Menu"): selling comes first on a phone */
+export const mobileNavItems: NavItem[] = MOBILE_PAGES.flatMap((href) =>
+  navSections.flatMap((section) => section.items).filter((item) => item.href === href && !item.comingSoon),
+);

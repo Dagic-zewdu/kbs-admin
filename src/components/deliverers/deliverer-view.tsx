@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { Bike, Building2, Loader2, Pencil, Phone, Power, Trash2 } from "lucide-react";
+import { Banknote, Bike, Building2, HandCoins, Loader2, Pencil, Phone, Power, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -14,13 +14,15 @@ import { getErrorMessage } from "@/lib/api-error";
 import { formatPrice } from "@/lib/labels";
 import { useChangeDelivererStatusMutation, useDeleteDelivererMutation, useGetDelivererQuery } from "@/store/api/deliverers.api";
 import { delivererTypeLabels } from "@/types/deliverer";
+import { DelivererDeliveries, DelivererMoneyHistory, HandinDialog, PayFeeDialog } from "./deliverer-money";
 
 /** One deliverer: how to call and pay them, and where things stand */
 export function DelivererView({ id }: { id: string }) {
   const router = useRouter();
   const params = useSearchParams();
   const { data, isLoading, error } = useGetDelivererQuery(id);
-  const [dialog, setDialog] = useState<"status" | "delete" | null>(null);
+  const [dialog, setDialog] = useState<"status" | "delete" | "fee" | "handin" | null>(null);
+  const [tab, setTab] = useState<"deliveries" | "money">("deliveries");
   const [notice, setNotice] = useState(params.get("saved") ? "Saved." : "");
   const [changeStatus, statusState] = useChangeDelivererStatusMutation();
   const [remove, deleteState] = useDeleteDelivererMutation();
@@ -37,12 +39,20 @@ export function DelivererView({ id }: { id: string }) {
         title={deliverer.name}
         backHref="/deliverers"
         actions={
-          <Link
-            href={`/deliverers/${id}/edit`}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:h-10"
-          >
-            <Pencil className="size-4" aria-hidden /> Edit
-          </Link>
+          <>
+            <Link
+              href={`/deliverers/${id}/edit`}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:h-10"
+            >
+              <Pencil className="size-4" aria-hidden /> Edit
+            </Link>
+            <Button type="button" variant="secondary" onClick={() => setDialog("handin")} disabled={money.cashHeld <= 0}>
+              <HandCoins className="size-4" aria-hidden /> Cash handed in
+            </Button>
+            <Button type="button" onClick={() => setDialog("fee")} disabled={money.feesOwed <= 0}>
+              <Banknote className="size-4" aria-hidden /> Pay fees
+            </Button>
+          </>
         }
       />
       {notice && <Alert type="success">{notice}</Alert>}
@@ -100,6 +110,24 @@ export function DelivererView({ id }: { id: string }) {
         )}
       </section>
 
+      <section className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <div role="tablist" className="flex border-b border-gray-100 px-2">
+          {(["deliveries", "money"] as const).map((item) => (
+            <button
+              key={item}
+              type="button"
+              role="tab"
+              aria-selected={tab === item}
+              onClick={() => setTab(item)}
+              className={clsx("min-h-11 border-b-2 px-3 text-sm font-medium", tab === item ? "border-brand-600 text-brand-700" : "border-transparent text-gray-500 hover:text-gray-800")}
+            >
+              {item === "deliveries" ? "Deliveries" : "Money"}
+            </button>
+          ))}
+        </div>
+        {tab === "deliveries" ? <DelivererDeliveries delivererId={id} /> : <DelivererMoneyHistory delivererId={id} onRemoved={setNotice} />}
+      </section>
+
       <section className="flex flex-wrap gap-2">
         <Button type="button" variant="secondary" onClick={() => setDialog("status")}>
           <Power className="size-4" aria-hidden /> {deliverer.isActive ? "Deactivate" : "Activate"}
@@ -111,6 +139,26 @@ export function DelivererView({ id }: { id: string }) {
         )}
       </section>
 
+      {dialog === "fee" && (
+        <PayFeeDialog
+          deliverer={deliverer}
+          onClose={() => setDialog(null)}
+          onDone={(message) => {
+            setDialog(null);
+            setNotice(message);
+          }}
+        />
+      )}
+      {dialog === "handin" && (
+        <HandinDialog
+          deliverer={deliverer}
+          onClose={() => setDialog(null)}
+          onDone={(message) => {
+            setDialog(null);
+            setNotice(message);
+          }}
+        />
+      )}
       <ConfirmDialog
         open={dialog === "status"}
         tone={deliverer.isActive ? "danger" : "default"}

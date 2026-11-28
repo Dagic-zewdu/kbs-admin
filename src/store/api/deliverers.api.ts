@@ -1,5 +1,6 @@
 import type { ApiResponse, PaginatedResult } from "@/types/auth";
-import type { Deliverer, DelivererInput, DelivererType, DelivererWithMoney } from "@/types/deliverer";
+import type { Deliverer, DelivererInput, DelivererMoneyEntry, DelivererType, DelivererWithMoney } from "@/types/deliverer";
+import type { SalePaymentMethod } from "@/types/sale";
 import { baseApi } from "./base-api";
 
 export type DeliverersPage = PaginatedResult<DelivererWithMoney> & { summary: { feesOwed: number; cashHeld: number; openDeliveries: number } };
@@ -32,6 +33,25 @@ export const deliverersApi = baseApi.injectEndpoints({
       query: ({ id, isActive }) => ({ url: `/admin/deliverers/${id}/status`, method: "PATCH", body: { isActive } }),
       invalidatesTags: ["Deliverers"],
     }),
+    listDelivererMoney: build.query<ApiResponse<PaginatedResult<DelivererMoneyEntry>>, { id: string; page: number; limit: number }>({
+      query: ({ id, ...params }) => ({ url: `/admin/deliverers/${id}/money`, params }),
+      providesTags: ["Deliverers"],
+    }),
+    payDelivererFee: build.mutation<ApiResponse<DelivererWithMoney>, { id: string; amount: number; method: SalePaymentMethod; paidOn: string | null; note: string | null }>({
+      query: ({ id, ...body }) => ({ url: `/admin/deliverers/${id}/fee-payments`, method: "POST", body }),
+      invalidatesTags: ["Deliverers"],
+    }),
+    recordHandin: build.mutation<
+      ApiResponse<DelivererWithMoney>,
+      { id: string; amount: number; keepFee: number; method: SalePaymentMethod; receivedOn: string | null; note: string | null }
+    >({
+      query: ({ id, ...body }) => ({ url: `/admin/deliverers/${id}/handins`, method: "POST", body }),
+      invalidatesTags: ["Deliverers"],
+    }),
+    removeDelivererMoney: build.mutation<ApiResponse<DelivererWithMoney>, { kind: "fee" | "handin"; id: string }>({
+      query: ({ kind, id }) => ({ url: `/admin/deliverers/${kind === "fee" ? "fee-payments" : "handins"}/${id}`, method: "DELETE" }),
+      invalidatesTags: ["Deliverers"],
+    }),
     deleteDeliverer: build.mutation<ApiResponse<{ id: string }>, string>({
       query: (id) => ({ url: `/admin/deliverers/${id}`, method: "DELETE" }),
       invalidatesTags: ["Deliverers"],
@@ -47,4 +67,8 @@ export const {
   useUpdateDelivererMutation,
   useChangeDelivererStatusMutation,
   useDeleteDelivererMutation,
+  useListDelivererMoneyQuery,
+  usePayDelivererFeeMutation,
+  useRecordHandinMutation,
+  useRemoveDelivererMoneyMutation,
 } = deliverersApi;
