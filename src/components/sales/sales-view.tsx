@@ -12,7 +12,7 @@ import { formatPrice } from "@/lib/labels";
 import { useListSalesQuery } from "@/store/api/sales.api";
 import { Alert } from "@/components/ui/alert";
 import { useListChannelsQuery } from "@/store/api/settings.api";
-import type { SaleListItem, SalePaymentStatus, SalesQuery } from "@/types/sale";
+import type { SaleListItem, SalePaymentStatus, SalesQuery, SaleStatus } from "@/types/sale";
 import { RevertSaleDialog } from "./sale-dialogs";
 import { DeliveryStatusBadge, formatTime, PaymentStatusBadge, SaleStatusBadge } from "./sale-badges";
 
@@ -37,6 +37,15 @@ const paymentFilters: { value: SalePaymentStatus | ""; label: string }[] = [
   { value: "refund_due", label: "Refund due" },
 ];
 
+/** Completed sales first; the others when asked */
+const statusFilters: { value: SaleStatus | ""; label: string }[] = [
+  { value: "completed", label: "Completed" },
+  { value: "", label: "All statuses" },
+  { value: "cancelled", label: "Cancelled" },
+  { value: "returned", label: "Returned" },
+  { value: "partly_returned", label: "Partly returned" },
+];
+
 const chip = (isOn: boolean) =>
   clsx(
     "min-h-9 shrink-0 rounded-full border px-3 text-sm font-medium whitespace-nowrap",
@@ -56,6 +65,7 @@ export function SalesView() {
   const [reverting, setReverting] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const { data: channelData } = useListChannelsQuery({ all: true });
+  const [status, setStatus] = useState<SaleStatus | "">("completed");
   const [paymentStatus, setPaymentStatus] = useState<SalePaymentStatus | "">("");
   const [delivery, setDelivery] = useState<SalesQuery["deliveryStatus"] | "">("");
   const [page, setPage] = useState(1);
@@ -69,6 +79,7 @@ export function SalesView() {
     search,
     ...dates,
     channelId: channel || undefined,
+    status: status || undefined,
     paymentStatus: paymentStatus || undefined,
     deliveryStatus: delivery || undefined,
   });
@@ -142,6 +153,13 @@ export function SalesView() {
           </div>
         )}
         <div className="flex flex-wrap gap-2">
+          <select value={status} onChange={(event) => (setStatus(event.target.value as SaleStatus | ""), reset())} aria-label="Status" className={selectClasses}>
+            {statusFilters.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
           <select value={channel} onChange={(event) => (setChannel(event.target.value), reset())} aria-label="Channel" className={selectClasses}>
             <option value="">Every channel</option>
             {(channelData?.data ?? []).map((item) => (
@@ -212,7 +230,12 @@ export function SalesView() {
                         )}
                       </span>
                       <span className="mt-0.5 block truncate text-sm text-gray-500">
-                        {[formatTime(sale.soldAt), sale.customer.name, sale.channel?.name, `${sale.units} ${sale.units === 1 ? "unit" : "units"}`, sale.seller?.name].filter(Boolean).join(" · ")}
+                        {[
+                          formatTime(sale.soldAt),
+                          sale.customer.name,
+                          sale.channel?.name && (sale.fromLive ? `${sale.channel.name} live` : sale.channel.name),
+                          sale.contactedAt && `contacted ${formatTime(sale.contactedAt)}`,
+                          `${sale.units} ${sale.units === 1 ? "unit" : "units"}`, sale.seller?.name].filter(Boolean).join(" · ")}
                       </span>
                     </span>
                     <span className="shrink-0 text-right text-sm">
@@ -226,13 +249,14 @@ export function SalesView() {
             </ul>
             {/* Bigger screens: a table with actions */}
             <div className="hidden overflow-x-auto md:block">
-              <table className="w-full min-w-[1100px] text-left text-sm">
+              <table className="w-full min-w-[1250px] text-left text-sm">
                 <thead className="border-b border-gray-100 bg-gray-50 text-xs font-semibold tracking-wide text-gray-500 uppercase">
                   <tr>
                     <th className="px-4 py-3">Sale</th>
-                    <th className="px-3 py-3">Date</th>
+                    <th className="px-3 py-3">Sale time</th>
                     <th className="px-3 py-3">Customer</th>
                     <th className="px-3 py-3">Channel</th>
+                    <th className="px-3 py-3">Contacted</th>
                     <th className="px-3 py-3 text-right">Units</th>
                     <th className="px-3 py-3 text-right">Total</th>
                     <th className="px-3 py-3 text-right">Paid</th>
@@ -262,7 +286,11 @@ export function SalesView() {
                         <span className="block text-gray-900">{sale.customer.name ?? "Walk-in"}</span>
                         {sale.customer.phone && <span className="block text-xs text-gray-500">{sale.customer.phone}</span>}
                       </td>
-                      <td className="px-3 py-3 text-gray-600">{sale.channel?.name ?? "—"}</td>
+                      <td className="px-3 py-3 text-gray-600">
+                        {sale.channel?.name ?? "—"}
+                        {sale.fromLive && <span className="ml-1.5 rounded-full bg-pink-50 px-2 py-0.5 text-xs font-medium text-brand-700">Live</span>}
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap text-gray-600">{sale.contactedAt ? formatTime(sale.contactedAt) : "—"}</td>
                       <td className="px-3 py-3 text-right tabular-nums">{sale.units}</td>
                       <td className="px-3 py-3 text-right font-medium whitespace-nowrap text-gray-900 tabular-nums">{formatPrice(sale.money.total)}</td>
                       <td className="px-3 py-3 text-right whitespace-nowrap tabular-nums">{formatPrice(sale.money.paid)}</td>

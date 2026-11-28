@@ -69,6 +69,10 @@ export interface SaleSummary {
   code: string;
   soldAt: string;
   channel: ChannelRef | null;
+  /** Came from a live video (TikTok …) */
+  fromLive: boolean;
+  /** When the customer first contacted us; soldAt is the sale time */
+  contactedAt: string | null;
   status: SaleStatus;
   cancelReason: string | null;
   cancelledAt: string | null;
@@ -132,6 +136,8 @@ export interface SaleListItem extends SaleSummary {
 export interface SaleInput {
   items: { variationId: string; quantity: number; discount: { type: "amount" | "percent"; value: number; reason: string } | null }[];
   channelId: string;
+  fromLive: boolean;
+  contactedAt: string | null;
   customerName: string | null;
   customerPhone: string | null;
   note: string | null;

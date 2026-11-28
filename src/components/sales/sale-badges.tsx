@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/lib/labels";
 import clsx from "clsx";
 import { deliveryStatusLabels, salePaymentStatusLabels, saleStatusLabels, type DeliveryStatus, type SalePaymentStatus, type SaleStatus } from "@/types/sale";
 
@@ -33,4 +34,5 @@ export const DeliveryStatusBadge = ({ status }: { status: DeliveryStatus }) => <
 
 export const SaleStatusBadge = ({ status }: { status: SaleStatus }) => <span className={clsx(badge, statusTones[status])}>{saleStatusLabels[status]}</span>;
 
-export const formatTime = (value: string) => new Date(value).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+/** Ethiopian time (GMT+3), with the year */
+export const formatTime = (value: string) => formatDateTime(value);

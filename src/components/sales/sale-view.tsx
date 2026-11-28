@@ -60,7 +60,14 @@ export function SaleView({ id }: { id: string }) {
     <div className="space-y-5 sm:space-y-6">
       <PageHeader
         title={`Sale ${sale.code}`}
-        description={[formatTime(sale.soldAt), sale.channel?.name, sale.seller?.name && `by ${sale.seller.name}`].filter(Boolean).join(" · ")}
+        description={[
+          `Sold ${formatTime(sale.soldAt)}`,
+          sale.channel?.name && (sale.fromLive ? `${sale.channel.name} live` : sale.channel.name),
+          sale.contactedAt && `Contacted ${formatTime(sale.contactedAt)}`,
+          sale.seller?.name && `by ${sale.seller.name}`,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
         backHref="/sales"
         actions={
           <>

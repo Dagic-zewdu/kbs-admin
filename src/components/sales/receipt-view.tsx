@@ -8,6 +8,7 @@ import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { getErrorMessage } from "@/lib/api-error";
+import { formatDateTime } from "@/lib/labels";
 import { useGetSaleQuery } from "@/store/api/sales.api";
 import { useGetSettingsQuery } from "@/store/api/settings.api";
 import { useAppSelector } from "@/store/hooks";
@@ -27,7 +28,7 @@ function Receipt({ sale, companyName, paper }: { sale: Sale; companyName: string
       <div className="text-center">
         <p className={clsx("font-bold", paper === "80mm" ? "text-[14px]" : "text-[20px]")}>{companyName}</p>
         <p>Receipt {sale.code}</p>
-        <p>{new Date(sale.soldAt).toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+        <p>{formatDateTime(sale.soldAt)}</p>
         <p>
           {sale.channel?.name}
           {sale.seller?.name && ` · Served by ${sale.seller.name}`}

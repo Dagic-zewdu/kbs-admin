@@ -15,6 +15,10 @@ export interface SaleDraft {
   lines: CartLine[];
   /** "" = Walk-in customer */
   channelId: string;
+  /** Came from a live video */
+  fromLive: boolean;
+  /** "2026-11-28T20:15" in Ethiopian time, "" = not given */
+  contactedAt: string;
   customerName: string;
   customerPhone: string;
   note: string;
@@ -29,6 +33,8 @@ export interface SaleDraft {
 export const emptySaleDraft = (): SaleDraft => ({
   lines: [],
   channelId: "",
+  fromLive: false,
+  contactedAt: "",
   customerName: "",
   customerPhone: "",
   note: "",

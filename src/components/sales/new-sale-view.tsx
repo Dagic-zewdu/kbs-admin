@@ -17,16 +17,19 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { FadeImage } from "@/components/ui/fade-image";
 import { PageHeader } from "@/components/ui/page-header";
 import { getErrorMessage } from "@/lib/api-error";
-import { formatDay, formatPrice } from "@/lib/labels";
+import { formatDay, formatPrice, localInputToIso, nowLocalInput } from "@/lib/labels";
 import { decimalText } from "@/lib/numbers";
 import { useGetDelivererQuery } from "@/store/api/deliverers.api";
 import { useCreateSaleMutation, useLazyLookupForSaleQuery } from "@/store/api/sales.api";
 import { useGetSettingsQuery } from "@/store/api/settings.api";
 import { useAppSelector } from "@/store/hooks";
 import type { Deliverer } from "@/types/deliverer";
-import type { SalesChannel } from "@/types/company-lists";
+import type { ChannelKind, SalesChannel } from "@/types/company-lists";
 import { problemText, saleProblemLabels, type SaleInput, type SaleLookup } from "@/types/sale";
 import { amountOf, birr, cents, emptySaleDraft, lineMoney, saleDraftStore, type CartLine, type SaleDraft } from "./sale-draft";
+
+/** Channels with live videos */
+const LIVE_KINDS: ChannelKind[] = ["tiktok", "instagram", "facebook"];
 
 const chip = (isOn: boolean) =>
   clsx(
@@ -51,6 +54,8 @@ function SaleForm({ userId }: { userId: string }) {
   const walkInId = channels.find((channel) => channel.kind === "walk_in")?.id ?? channels[0]?.id ?? "";
   // The cart is kept on this device, so a refresh or a phone call doesn't lose it
   const [draft, setDraft] = useState<SaleDraft>(() => saleDraftStore.read(userId) ?? emptySaleDraft());
+  const chosenChannel = channels.find((channel) => channel.id === (draft.channelId || walkInId));
+  const isWalkIn = !chosenChannel || chosenChannel.kind === "walk_in";
   const [localError, setLocalError] = useState("");
   const [isClearing, setIsClearing] = useState(false);
   const [create, createState] = useCreateSaleMutation();
@@ -162,6 +167,9 @@ function SaleForm({ userId }: { userId: string }) {
             : null,
       })),
       channelId: draft.channelId || walkInId,
+      // Only for a channel the customer contacts us through
+      fromLive: !isWalkIn && LIVE_KINDS.includes(chosenChannel?.kind ?? "other") && draft.fromLive,
+      contactedAt: isWalkIn ? null : localInputToIso(draft.contactedAt),
       customerName: draft.customerName.trim() || null,
       customerPhone: draft.customerPhone.trim() || null,
       note: draft.note.trim() || null,
@@ -598,6 +606,7 @@ function Cart({ lines, setLine, onRemove }: { lines: CartLine[]; setLine: (varia
 
 function Customer({ draft, change, channels, walkInId }: { draft: SaleDraft; change: (update: Partial<SaleDraft>) => void; channels: SalesChannel[]; walkInId: string }) {
   const chosen = draft.channelId || walkInId;
+  const channel = channels.find((item) => item.id === chosen);
   const isDelivery = draft.mode === "delivery";
   return (
     <section className="space-y-4 rounded-xl border border-gray-200 bg-white p-4">
@@ -611,6 +620,25 @@ function Customer({ draft, change, channels, walkInId }: { draft: SaleDraft; cha
           ))}
         </select>
       </Field>
+      {channel && channel.kind !== "walk_in" && (
+        <div className="space-y-3 rounded-lg bg-gray-50 p-3">
+          {LIVE_KINDS.includes(channel.kind) && (
+            <label className="flex min-h-9 cursor-pointer items-center gap-3 text-sm text-gray-800">
+              <input
+                type="checkbox"
+                checked={draft.fromLive}
+                onChange={(event) => change({ fromLive: event.target.checked, contactedAt: event.target.checked && !draft.contactedAt ? nowLocalInput() : draft.contactedAt })}
+                className="size-5 rounded border-gray-300 text-brand-600"
+              />
+              Came from a {channel.name} live video
+            </label>
+          )}
+          <Field label="When did the customer contact you? (optional)">
+            <input type="datetime-local" value={draft.contactedAt} max={nowLocalInput()} onChange={(event) => change({ contactedAt: event.target.value })} className={inputClasses} />
+          </Field>
+          <p className="text-xs text-gray-500">Date and time of their first message, Ethiopian time. The sale time is saved by itself.</p>
+        </div>
+      )}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
         <Field label={isDelivery ? "Name" : "Name (optional)"} isRequired={isDelivery}>
           <input value={draft.customerName} maxLength={120} onChange={(event) => change({ customerName: event.target.value })} placeholder="Meron Alemu" className={inputClasses} />
